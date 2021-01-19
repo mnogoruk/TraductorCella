@@ -4,14 +4,23 @@ from django.contrib import admin
 from .models import *
 
 admin.site.register(Operator)
+
 admin.site.register(ResourceProvider)
 admin.site.register(Resource)
-admin.site.register(StorageAction)
-admin.site.register(CostAction)
-admin.site.register(ServiceAction)
+admin.site.register(ResourceCost)
+
+admin.site.register(ResourceStorageAction)
+admin.site.register(ResourceCostAction)
+admin.site.register(ResourceServiceAction)
+
 admin.site.register(SpecificationCategory)
 admin.site.register(Specification)
 admin.site.register(ResourceSpecification)
-admin.site.register(SpecificationAction)
-admin.site.register(ResourceCost)
+
+admin.site.register(SpecificationCaptureAction)
+admin.site.register(SpecificationCoefficientAction)
+admin.site.register(SpecificationServiceAction)
+
+
 admin.site.register(UnverifiedCost)
+admin.site.register(UnresolvedProduct)
