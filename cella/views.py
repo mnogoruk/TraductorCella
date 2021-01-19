@@ -5,7 +5,13 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from .service import Resources, Specifications, Verify
-from .forms import ResourceStoragePriceFormSet, ResourceCreateForm, ResourceEditForm
+from .forms import (
+    ResourceStoragePriceFormSet,
+    ResourceCreateForm,
+    ResourceEditForm,
+    SpecificationCreateForm,
+    SpecificationResourceFormSet
+)
 from .models import Resource
 
 
@@ -93,3 +99,29 @@ def resource_edit(request, r_id):
 
 def resource_unverified(request):
     return render(request, 'resource_unverified.html', context={'resources': Verify.unverified_resources()})
+
+
+def specification_create(request):
+    if request.method == 'POST':
+        specification_form = SpecificationCreateForm(request.POST)
+        resources_specification_formset = SpecificationResourceFormSet(request.POST)
+        if specification_form.is_valid() and resources_specification_formset.is_valid():
+            spec_data = specification_form.cleaned_data
+            spec_data['resources'] = []
+            for resource in resources_specification_formset.cleaned_data:
+                if len(resource) == 0:
+                    break
+                spec_data['resources'].append({'amount': float(resource['amount']), 'id': resource['resource'].id})
+            print(spec_data)
+            Specifications.specification_create(
+                specification_name=spec_data['specification_name'],
+                product_id=spec_data['product_id'],
+                category_name=spec_data['category_name'].category_name,
+                coefficient=spec_data['coefficient'],
+                use_category_coefficient=spec_data['use_category_coefficient'],
+                is_active=spec_data['is_active'],
+                resources=spec_data['resources'])
+        return HttpResponseRedirect(reverse('specification_list'))
+    else:
+        return render(request, 'specification_create.html',
+                      context={'form': SpecificationCreateForm, 'forms': SpecificationResourceFormSet()})

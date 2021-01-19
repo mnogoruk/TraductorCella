@@ -357,7 +357,7 @@ class Specifications:
         operator = Operators.get_operator_by_user(user)
 
         if category_name is not None:
-            category = SpecificationCategory.objects.get_or_create(category_name=category_name)
+            category = SpecificationCategory.objects.get_or_create(category_name=category_name)[0]
         else:
             category = None
         specification = Specification.objects.create(specification_name=specification_name,
@@ -496,5 +496,4 @@ class Verify:
         INNER JOIN {ResourceSpecification._meta.db_table} rs
         ON (s.id = rs.specifiaction_id)
         INNER JOIN ({cls.unverified_resources()}) unv_res
-        ON (unv_res.id = rs.resource_id)"""
-        )
+        ON (unv_res.id = rs.resource_id)""")

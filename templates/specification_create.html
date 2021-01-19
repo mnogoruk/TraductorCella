@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<form method="post">
+    {% csrf_token %}
+    <table>
+        {{ form }}
+    </table>
+    <table>
+        {{ forms.management_form }}
+        <select name="form-0-resource" id="id_form-0-resource">
+            <option value="" selected="">---------</option>
+            <option value="1">Коробка - 13-14-123</option>
+            <option value="2">Коробка 2 - 13-14-1231</option>
+            <option value="3">Коробка 31232 - 13-14-1232332453</option>
+            <option value="4">Этикетка малая - 124-14ё</option>
+            <option value="5">Коробка 2 - 13-14-12313</option>
+            <option value="6">Клей - 241</option>
+        </select>
+        <input type="number" name="form-0-amount" step="0.01" id="id_form-0-amount">
+        <br>
+        <select name="form-1-resource" id="id_form-1-resource">
+            <option value="" selected="">---------</option>
+            <option value="1">Коробка - 13-14-123</option>
+            <option value="2">Коробка 2 - 13-14-1231</option>
+            <option value="3">Коробка 31232 - 13-14-1232332453</option>
+            <option value="4">Этикетка малая - 124-14ё</option>
+            <option value="5">Коробка 2 - 13-14-12313</option>
+            <option value="6">Клей - 241</option>
+        </select>
+        <input type="number" name="form-1-amount" step="0.01" id="id_form-1-amount">
+        <br>
+        <select name="form-2-resource" id="id_form-2-resource">
+            <option value="" selected="">---------</option>
+            <option value="1">Коробка - 13-14-123</option>
+            <option value="2">Коробка 2 - 13-14-1231</option>
+            <option value="3">Коробка 31232 - 13-14-1232332453</option>
+            <option value="4">Этикетка малая - 124-14ё</option>
+            <option value="5">Коробка 2 - 13-14-12313</option>
+            <option value="6">Клей - 241</option>
+        </select>
+        <input type="number" name="form-2-amount" step="0.01" id="id_form-2-amount">
+    </table>
+    <input type="submit">
+</form>
+</body>
+</html>

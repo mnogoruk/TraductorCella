@@ -1,5 +1,5 @@
 from django import forms
-from .models import ResourceProvider
+from .models import ResourceProvider, SpecificationCategory, Resource
 
 
 class ResourceStoragePriceForm(forms.Form):
@@ -29,3 +29,25 @@ class ResourceEditForm(forms.Form):
         queryset=ResourceProvider.objects.all()
     )
     amount = forms.DecimalField(max_digits=8, decimal_places=2)
+
+
+class SpecificationCreateForm(forms.Form):
+    specification_name = forms.CharField(required=True)
+    product_id = forms.CharField(required=True)
+    category_name = forms.ModelChoiceField(
+        queryset=SpecificationCategory.objects.all(),
+        required=False
+    )
+    coefficient = forms.FloatField(required=False)
+    use_category_coefficient = forms.BooleanField(required=False)
+    is_active = forms.BooleanField(required=False)
+
+
+class SpecificationResourceForm(forms.Form):
+    resource = forms.ModelChoiceField(
+        queryset=Resource.objects.all()
+    )
+    amount = forms.DecimalField(max_digits=8, decimal_places=2)
+
+
+SpecificationResourceFormSet = forms.formset_factory(SpecificationResourceForm, extra=999)
