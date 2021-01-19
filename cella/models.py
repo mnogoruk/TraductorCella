@@ -24,7 +24,10 @@ class UpdateGenericModel(models.Model):
 
 class Operator(models.Model):
     is_service = models.BooleanField(default=False)
-    user = models.OneToOneField(get_user_model(), on_delete=models.SET_NULL, null=True, related_name='operator',
+    user = models.OneToOneField(get_user_model(),
+                                on_delete=models.SET_NULL,
+                                related_name='operator',
+                                null=True,
                                 blank=True)
     is_anonymous = models.BooleanField(default=False)
 
@@ -55,8 +58,11 @@ class ResourceProvider(models.Model):
 
 
 class Resource(CreateGenericModel, UpdateGenericModel):
-    resource_provider = models.ForeignKey(ResourceProvider, on_delete=models.SET_NULL, null=True, blank=True,
-                                          related_name='resources')
+    resource_provider = models.ForeignKey(ResourceProvider,
+                                          on_delete=models.SET_NULL,
+                                          related_name='resources',
+                                          null=True,
+                                          blank=True)
     resource_name = models.CharField(max_length=100)
     external_id = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=8, decimal_places=2)
@@ -74,54 +80,73 @@ class ResourceCost(CreateGenericModel):
 
 
 class UnverifiedCost(models.Model):
-    last_verified_cost = models.ForeignKey(ResourceCost, on_delete=models.CASCADE,
+    last_verified_cost = models.ForeignKey(ResourceCost,
+                                           on_delete=models.CASCADE,
                                            related_name='unverified_cost_as_old')
-    new_cost = models.ForeignKey(ResourceCost, on_delete=models.CASCADE, related_name='unverified_cost_as_new')
+    new_cost = models.ForeignKey(ResourceCost,
+                                 on_delete=models.CASCADE,
+                                 related_name='unverified_cost_as_new')
 
     def __str__(self):
         return f"{self.last_verified_cost.resource.resource_name} from {self.last_verified_cost.value} to {self.new_cost.value}"
 
 
-class StorageAction(models.Model):
+class ResourceStorageAction(models.Model):
     class ActionType(models.TextChoices):
         ADD = 'ADD', 'Add'
         REMOVE = 'RMV', 'Remove'
+        SET = 'SET', 'Set'
 
-    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='storage_actions')
+    resource = models.ForeignKey(Resource,
+                                 on_delete=models.CASCADE,
+                                 related_name='resource_storage_actions')
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     action_datetime = models.DateTimeField(auto_now_add=True)
     value = models.DecimalField(max_digits=8, decimal_places=2)
-    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True, related_name='storage_actions')
+    operator = models.ForeignKey(Operator,
+                                 on_delete=models.SET_NULL,
+                                 related_name='resource_storage_actions',
+                                 null=True)
 
     def __str__(self):
         return f"{self.action_type} for {self.resource}"
 
 
-class CostAction(models.Model):
+class ResourceCostAction(models.Model):
     class ActionType(models.TextChoices):
         RISE = 'RSE', 'Rise'
         DROP = 'DRP', 'Drop'
         SET = 'SET', 'Set'
 
-    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='price_actions')
+    resource = models.ForeignKey(Resource,
+                                 on_delete=models.CASCADE,
+                                 related_name='resource_cost_actions')
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     action_datetime = models.DateTimeField(auto_now_add=True)
     value = models.DecimalField(max_digits=8, decimal_places=2)
-    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True, related_name='price_actions')
+    operator = models.ForeignKey(Operator,
+                                 on_delete=models.SET_NULL,
+                                 related_name='resource_cost_actions',
+                                 null=True)
 
     def __str__(self):
         return f"{self.action_type} for {self.resource}"
 
 
-class ServiceAction(models.Model):
+class ResourceServiceAction(models.Model):
     class ActionType(models.TextChoices):
         CREATE = 'CRT', 'Create'
         DEACTIVATE = 'DCT', 'Deactivate'
 
-    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='service_actions')
+    resource = models.ForeignKey(Resource,
+                                 on_delete=models.CASCADE,
+                                 related_name='resource_service_actions')
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     action_datetime = models.DateTimeField(auto_now_add=True)
-    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True, related_name='service_actions')
+    operator = models.ForeignKey(Operator,
+                                 on_delete=models.SET_NULL,
+                                 related_name='resource_service_actions',
+                                 null=True)
 
     def __str__(self):
         return f"{self.action_type} for {self.resource}"
@@ -138,9 +163,15 @@ class SpecificationCategory(CreateGenericModel, UpdateGenericModel):
 class Specification(CreateGenericModel, UpdateGenericModel):
     specification_name = models.CharField(max_length=100)
     product_id = models.CharField(max_length=50)
-    category = models.ForeignKey(SpecificationCategory, on_delete=models.SET_NULL, null=True,
-                                 related_name='specifications', blank=True)
-    coefficient = models.DecimalField(max_digits=8, decimal_places=3, blank=True, null=True)
+    category = models.ForeignKey(SpecificationCategory,
+                                 on_delete=models.SET_NULL,
+                                 related_name='specifications',
+                                 null=True,
+                                 blank=True)
+    coefficient = models.DecimalField(max_digits=8,
+                                      decimal_places=3,
+                                      null=True,
+                                      blank=True)
     use_category_coefficient = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
@@ -157,10 +188,10 @@ class Specification(CreateGenericModel, UpdateGenericModel):
             models.CheckConstraint(
                 check=(
                         (models.Q(use_category_coefficient=True) &
-                         models.Q(category__isnull=False) &
+                         models.Q(category_id__isnull=False) &
                          models.Q(coefficient__isnull=True)) |
                         (models.Q(use_category_coefficient=False) &
-                         models.Q(category__isnull=True) &
+                         models.Q(category_id__isnull=True) &
                          models.Q(coefficient__isnull=False))
                 ),
                 name='%(app_label)s_%(class)s_check_coefficient'
@@ -177,14 +208,75 @@ class ResourceSpecification(models.Model):
         return f"{self.resource.resource_name} - {self.specification.specification_name}"
 
 
-class SpecificationAction(models.Model):
-    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='specification_actions')
-    old_price = models.DecimalField(max_digits=8, decimal_places=2)
-    new_price = models.DecimalField(max_digits=8, decimal_places=2, null=True)
+class SpecificationCoefficientAction(models.Model):
+    class ActionType(models.TextChoices):
+        RISE = 'RSE', 'Rise'
+        DROP = 'DRP', 'Drop'
+        SET = 'SET', 'Set'
+        SET_BY_CATEGORY = 'SBC', 'Set by category'
 
-    @property
-    def delta_price(self):
-        if self.old_price is not None:
-            return self.new_price - self.old_price
-        else:
-            return 0
+    specification = models.ForeignKey(Specification,
+                                      on_delete=models.SET_NULL,
+                                      related_name='specification_coefficient_actions',
+                                      null=True)
+    action_type = models.CharField(max_length=3,
+                                   choices=ActionType.choices)
+    value = models.DecimalField(max_digits=8, decimal_places=2)
+    action_datetime = models.DateTimeField(auto_now_add=True)
+    operator = models.ForeignKey(Operator,
+                                 on_delete=models.SET_NULL,
+                                 related_name='specification_coefficient_actions',
+                                 null=True, )
+
+    def __str__(self):
+        return f"{self.action_type} for {self.specification}"
+
+
+class SpecificationCaptureAction(models.Model):
+    class ActionType(models.TextChoices):
+        CAPTURE = 'CPT', 'Capture'
+        RETURN = 'RTN', 'Return'
+
+    specification = models.ForeignKey(Specification,
+                                      on_delete=models.SET_NULL,
+                                      related_name='specification_capture_actions',
+                                      null=True)
+    action_type = models.CharField(max_length=3, choices=ActionType.choices)
+    value = models.DecimalField(max_digits=8, decimal_places=2)
+    action_datetime = models.DateTimeField(auto_now_add=True)
+    operator = models.ForeignKey(Operator,
+                                 on_delete=models.SET_NULL,
+                                 related_name='specification_capture_actions',
+                                 null=True)
+
+    def __str__(self):
+        return f"{self.action_type} for {self.specification}"
+
+
+class SpecificationServiceAction(models.Model):
+    class ActionType(models.TextChoices):
+        CREATE = 'CRT', 'Create'
+        DEACTIVATE = 'DCT', 'Deactivate'
+        ACTIVATE = 'ACT', 'Activate'
+        DELETE = 'DLT', 'Delete'
+
+    specification = models.ForeignKey(Specification,
+                                      on_delete=models.SET_NULL,
+                                      related_name='specification_service_actions',
+                                      null=True)
+    action_type = models.CharField(max_length=3, choices=ActionType.choices)
+    action_datetime = models.DateTimeField(auto_now_add=True)
+    operator = models.ForeignKey(Operator,
+                                 on_delete=models.SET_NULL,
+                                 related_name='specification_service_actions',
+                                 null=True)
+
+    def __str__(self):
+        return f"{self.action_type} for {self.specification}"
+
+
+class UnresolvedProduct(CreateGenericModel):
+    product_id = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.product_id}"
