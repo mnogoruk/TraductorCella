@@ -1,8 +1,8 @@
 from .models import (
     Resource,
-    StorageAction,
-    CostAction,
-    ServiceAction,
+    ResourceStorageAction,
+    ResourceCostAction,
+    ResourceServiceAction,
     ResourceProvider,
     ResourceCost,
     UnverifiedCost,
@@ -10,7 +10,6 @@ from .models import (
     Specification,
     SpecificationCategory,
     ResourceSpecification,
-    SpecificationAction,
 )
 from django.db.models import Q, FilteredRelation, Max, F, Case, When, Sum
 from collections import namedtuple
@@ -39,23 +38,62 @@ class Resources:
         with connection.cursor() as cursor:
             cursor.execute(f"""
              SELECT action_type, action_datetime, value, 'price' AS action
-             FROM {CostAction._meta.db_table}
+             FROM {ResourceCostAction._meta.db_table}
              WHERE resource_id = {resource.id}
             UNION
              SELECT action_type, action_datetime, value, 'storage' AS action
-             FROM {StorageAction._meta.db_table}
+             FROM {ResourceStorageAction._meta.db_table}
              WHERE resource_id = {resource.id}
             UNION
              SELECT action_type, action_datetime, NULL AS value, 'service' AS action
-             FROM {ServiceAction._meta.db_table}
+             FROM {ResourceServiceAction._meta.db_table}
              WHERE resource_id = {resource.id}
             ORDER BY action_datetime
             """)
             return cursor.fetchall(), resource
 
     @classmethod
-    def resource_create(cls, data):
-        ...
+    def resource_create(cls, resource_name: str,
+                        external_id: str,
+                        cost: float,
+                        amount: float = 0,
+                        provider_name: str = None,
+                        user=None):
+
+        if provider_name is not None:
+            provider = ResourceProvider.objects.get_or_create(provider_name=provider_name)[0]
+        else:
+            provider = None
+
+        operator = Operators.get_operator_by_user(user)
+
+        resource = Resource.objects.create(resource_name=resource_name,
+                                           external_id=external_id,
+                                           amount=amount,
+                                           resource_provider=provider)
+
+        cost_value = ResourceCost.objects.create(resource=resource, value=cost).value
+
+        resource_cost_action = ResourceCostAction.objects.create(
+            resource=resource,
+            action_type=ResourceCostAction.ActionType.SET,
+            value=cost,
+            operator=operator
+        )
+        resource_storage_action = ResourceStorageAction.objects.create(
+            resource=resource,
+            action_type=ResourceStorageAction.ActionType.SET,
+            value=amount,
+            operator=operator
+        )
+        resource_service_action = ResourceServiceAction.objects.create(
+            resource=resource,
+            action_type=ResourceServiceAction.ActionType.CREATE,
+            operator=operator
+        )
+
+        resource.cost = cost_value
+        return resource, (resource_cost_action, resource_storage_action, resource_service_action)
 
     @classmethod
     def resource_edit(cls, r_id, data):
@@ -68,16 +106,16 @@ class Resources:
         FROM {Resource._meta.db_table} 
         LEFT JOIN (
             SELECT o.value as storage_value, o.resource_id, o.action_datetime as storage_action_datetime
-            FROM  {StorageAction._meta.db_table} o
-            LEFT JOIN {StorageAction._meta.db_table} b
+            FROM  {ResourceStorageAction._meta.db_table} o
+            LEFT JOIN {ResourceStorageAction._meta.db_table} b
             ON o.resource_id = b.resource_id AND o.action_datetime < b.action_datetime
             WHERE b.action_datetime is NULL
             ) storage_action
         ON ({Resource._meta.db_table}.id = storage_action.resource_id)
         LEFT JOIN (
             SELECT o.value as price_value, o.resource_id, o.action_datetime as cost_action_datetime
-            FROM  {CostAction._meta.db_table} o
-            LEFT JOIN {CostAction._meta.db_table} b
+            FROM  {ResourceCostAction._meta.db_table} o
+            LEFT JOIN {ResourceCostAction._meta.db_table} b
             ON o.resource_id = b.resource_id AND o.action_datetime < b.action_datetime
             WHERE b.action_datetime is NULL
             ) price_action
@@ -98,7 +136,7 @@ class Resources:
     @classmethod
     def set_new_costs(cls, external_resource_ids: list, new_prices: list, user):
 
-        format_external_ids = f"({external_resource_ids[0]})" if len(
+        format_external_ids = f"('{external_resource_ids[0]}')" if len(
             external_resource_ids) == 1 else f"{tuple(external_resource_ids)}"
 
         resources = Resource.objects.raw(f"""
@@ -145,21 +183,21 @@ class Resources:
             if resource.cost_id is not None:
 
                 if new_prices[i] > resource.cost_value:
-                    action_type = CostAction.ActionType.RISE
+                    action_type = ResourceCostAction.ActionType.RISE
                 else:
-                    action_type = CostAction.ActionType.DROP
+                    action_type = ResourceCostAction.ActionType.DROP
                 value = new_prices[i] - resource.cost_value
 
             else:
-                action_type = CostAction.ActionType.SET
+                action_type = ResourceCostAction.ActionType.SET
                 value = new_prices[i]
 
-            cost_actions.append(CostAction(value=value,
-                                           operator=operator,
-                                           resource=resource,
-                                           action_type=action_type))
+            cost_actions.append(ResourceCostAction(value=value,
+                                                   operator=operator,
+                                                   resource=resource,
+                                                   action_type=action_type))
 
-        CostAction.objects.bulk_create(cost_actions)
+        ResourceCostAction.objects.bulk_create(cost_actions)
         # ResourceCost.objects.bulk_create(costs)
         if len(unverified_costs_create) != 0:
             UnverifiedCost.objects.bulk_create(unverified_costs_create)
@@ -176,16 +214,16 @@ class Resources:
         for i, resource in enumerate(resources):
             resource.amount += delta_amount[i]
             if delta_amount[i] > 0:
-                action_type = StorageAction.ActionType.ADD
+                action_type = ResourceStorageAction.ActionType.ADD
             else:
-                action_type = StorageAction.ActionType.REMOVE
-            storage_actions.append(StorageAction(value=delta_amount[i],
-                                                 operator=operator,
-                                                 resource=resource,
-                                                 action_type=action_type))
+                action_type = ResourceStorageAction.ActionType.REMOVE
+            storage_actions.append(ResourceStorageAction(value=delta_amount[i],
+                                                         operator=operator,
+                                                         resource=resource,
+                                                         action_type=action_type))
 
         Resource.objects.bulk_update(resources, ['amount'])
-        StorageAction.objects.bulk_create(storage_actions)
+        ResourceStorageAction.objects.bulk_create(storage_actions)
 
 
 class Specifications:
@@ -261,6 +299,14 @@ class Specifications:
         ...
 
     @classmethod
+    def specification_delete(cls, s_id):
+        ...
+
+    @classmethod
+    def specification_deactivate(cls, s_id):
+        ...
+
+    @classmethod
     def specification_list(cls):
         return Specification.objects.raw(
             f"""
@@ -298,3 +344,18 @@ class Specifications:
             ON (r.id = c.resource_id)
             GROUP BY s.id
             """)[:]
+
+    @classmethod
+    def specification_capture(cls, s_id):
+        ...
+
+
+class Verify:
+
+    @classmethod
+    def unverified_resources(cls):
+        ...
+
+    @classmethod
+    def unverified_specifications(cls, resources=None):
+        ...

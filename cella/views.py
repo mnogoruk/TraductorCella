@@ -1,8 +1,11 @@
+from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
 # Create your views here.
+from django.urls import reverse
+
 from .service import Resources, Specifications
-from .forms import ResourceStoragePriceFormSet
+from .forms import ResourceStoragePriceFormSet, ResourceCreateForm
 
 
 def resources(request):
@@ -41,3 +44,19 @@ def specifications(request):
 def resource_detail(request, r_id):
     history, resource = Resources.resource(r_id)
     return render(request, 'resource_detail.html', context={'resource': resource, 'history': history})
+
+
+def resource_create(request):
+    if request.method == 'POST':
+        form = ResourceCreateForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            Resources.resource_create(resource_name=data.get('resource_name'),
+                                      external_id=data.get('external_id'),
+                                      cost=float(data.get('cost')),
+                                      amount=float(data.get('amount')),
+                                      provider_name=data.get('provider_name').provider_name,
+                                      user=request.user)
+            return HttpResponseRedirect(reverse('resource_list'))
+    else:
+        return render(request, 'resource_create.html', context={'form': ResourceCreateForm()})

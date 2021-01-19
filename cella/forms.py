@@ -1,4 +1,5 @@
 from django import forms
+from .models import ResourceProvider
 
 
 class ResourceStoragePriceForm(forms.Form):
@@ -10,3 +11,11 @@ class ResourceStoragePriceForm(forms.Form):
 ResourceStoragePriceFormSet = forms.formset_factory(ResourceStoragePriceForm, extra=999)
 
 
+class ResourceCreateForm(forms.Form):
+    external_id = forms.CharField(required=True)
+    resource_name = forms.CharField(required=True)
+    cost = forms.DecimalField(required=True)
+    provider_name = forms.ModelChoiceField(
+        queryset=ResourceProvider.objects.all()
+    )
+    amount = forms.DecimalField(max_digits=8, decimal_places=2)
