@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<table border="1">
+
+    {% for specifiaction in specifiactions %}
+        <tr>
+            <td>{{ specifiaction.name }}</td>
+            <td>{{ specifiaction.name_category }}</td>
+            <td>{{ specifiaction.prime_cost }}</td>
+            <td>{{ specifiaction.coefficient }}</td>
+            <td>{{ specifiaction.total_cost }}</td>
+        </tr>
+    {% endfor %}
+</table>
+</body>
+</html>

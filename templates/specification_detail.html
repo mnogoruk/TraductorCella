@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+</head>
+<body>
+Название: {{ specification.name }}
+<br>
+Ппродукт: {{ specification.product_id }}
+<br>
+Категория: {{ specification.name_category }}
+<br>
+Себес: {{ specification.prime_cost }}s
+<br>
+Коефицент: {{ specification.coefficient }}
+<br>
+Цена: {{ specification.price }}
+<table border="1">
+    {% for resourece in resources %}
+        <tr>
+            <td>{{ resourece.name }}</td>
+            <td>{{ resourece.amount }}</td>
+            <td>{{ resourece.cost_value }}</td>
+            <td>{{ resourece.total_cost }}</td>
+        </tr>
+    {% endfor %}
+
+</table>
+</body>
+</html>

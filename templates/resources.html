@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<form method="post">
+    {{ form.management_form }}
+    {% csrf_token %}
+    <table border="1">
+        <tr>
+            <th>Название</th>
+            <th>Поставщик</th>
+            <th>Внешний ID</th>
+            <th>Текущая цена</th>
+            <th>Количество</th>
+            <th>Последение изменение цены</th>
+            <th>Полсдение изменние количества</th>
+            <th>новая цена</th>
+            <th>поставка</th>
+        </tr>
+        {% for resource in resources %}
+            <tr>
+                <td> {{ resource.resource_name }}</td>
+                <td> {{ resource.provider_name }}</td>
+                <td><input type="text" name="form-{{ resource.id }}-external_id"
+                           id="id_form-{{ resource.id }}-external_id" value="{{ resource.external_id }}"></td>
+                <td> {{ resource.cost }}</td>
+                <td> {{ resource.amount }}</td>
+                <td> {{ resource.cost_action_datetime }}: {{ resource.price_value }}</td>
+                <td> {{ resource.storage_action_datetime }}: {{ resource.storage_value }}</td>
+                <td><input type="number" name="form-{{ resource.id }}-new_price" step="0.01"
+                           id="id_form-{{ resource.id }}-new_price"></td>
+                <td><input type="number" name="form-{{ resource.id }}-delta_amount" step="0.01"
+                           id="id_form-{{ resource.id }}-delta_amount"></td>
+            </tr>
+        {% endfor %}
+
+    </table>
+    <input type="submit" value="OK">
+</form>
+</body>
+</html>
