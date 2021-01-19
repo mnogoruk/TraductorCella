@@ -9,6 +9,9 @@ from .models import (
     Operator,
     Specification,
     SpecificationCategory,
+    SpecificationServiceAction,
+    SpecificationCoefficientAction,
+    SpecificationCaptureAction,
     ResourceSpecification,
 )
 from django.db.models import Q, FilteredRelation, Max, F, Case, When, Sum
@@ -53,7 +56,8 @@ class Resources:
             return cursor.fetchall(), resource
 
     @classmethod
-    def resource_create(cls, resource_name: str,
+    def resource_create(cls,
+                        resource_name: str,
                         external_id: str,
                         cost: float,
                         amount: float = 0,
@@ -64,6 +68,8 @@ class Resources:
             provider = ResourceProvider.objects.get_or_create(provider_name=provider_name)[0]
         else:
             provider = None
+
+        # TODO: check fields
 
         operator = Operators.get_operator_by_user(user)
 
@@ -96,8 +102,36 @@ class Resources:
         return resource, (resource_cost_action, resource_storage_action, resource_service_action)
 
     @classmethod
-    def resource_edit(cls, r_id, data):
-        ...
+    def resource_edit(cls,
+                      r_id,
+                      resource_name=None,
+                      external_id=None,
+                      cost: float = None,
+                      amount: float = None,
+                      provider_name: str = None,
+                      user=None):
+        # TODO: check fields
+        data = dict()
+        if resource_name is not None:
+            data['resource_name'] = resource_name
+        if external_id is not None:
+            data['external_id'] = external_id
+        if provider_name is not None:
+            data['resource_provider'] = ResourceProvider.objects.get_or_create(provider_name=provider_name)[0]
+        if amount is not None:
+            data['amount'] = amount
+
+        Resource.objects.filter(id=r_id).update(**data)
+
+        if cost is not None:
+            Resources.set_new_costs([external_id], [cost], user=user)
+
+        if amount is not None:
+            Resources.set_new_amounts([external_id], [cost], user=user)
+
+    @classmethod
+    def resource_delete(cls, r_id):
+        Resource.objects.get(id=r_id).delete()
 
     @classmethod
     def resource_list(cls):
@@ -134,11 +168,10 @@ class Resources:
         return a[:]
 
     @classmethod
-    def set_new_costs(cls, external_resource_ids: list, new_prices: list, user):
+    def set_new_costs(cls, external_resource_ids: list, new_costs: list, user):
 
         format_external_ids = f"('{external_resource_ids[0]}')" if len(
             external_resource_ids) == 1 else f"{tuple(external_resource_ids)}"
-
         resources = Resource.objects.raw(f"""
         SELECT *  
         FROM {Resource._meta.db_table} 
@@ -166,7 +199,7 @@ class Resources:
         costs = []
 
         for i, resource in enumerate(resources):
-            new_cost = ResourceCost(resource=resource, value=new_prices[i])
+            new_cost = ResourceCost(resource=resource, value=new_costs[i])
             costs.append(new_cost)
             new_cost.save()  # TODO: optimize
 
@@ -182,15 +215,15 @@ class Resources:
 
             if resource.cost_id is not None:
 
-                if new_prices[i] > resource.cost_value:
+                if new_costs[i] > resource.cost_value:
                     action_type = ResourceCostAction.ActionType.RISE
                 else:
                     action_type = ResourceCostAction.ActionType.DROP
-                value = new_prices[i] - resource.cost_value
+                value = new_costs[i] - resource.cost_value
 
             else:
                 action_type = ResourceCostAction.ActionType.SET
-                value = new_prices[i]
+                value = new_costs[i]
 
             cost_actions.append(ResourceCostAction(value=value,
                                                    operator=operator,
@@ -218,6 +251,24 @@ class Resources:
             else:
                 action_type = ResourceStorageAction.ActionType.REMOVE
             storage_actions.append(ResourceStorageAction(value=delta_amount[i],
+                                                         operator=operator,
+                                                         resource=resource,
+                                                         action_type=action_type))
+
+        Resource.objects.bulk_update(resources, ['amount'])
+        ResourceStorageAction.objects.bulk_create(storage_actions)
+
+    @classmethod
+    def set_new_amounts(cls, external_resource_id: list, amounts: list, user):
+
+        operator = Operators.get_operator_by_user(user)
+        resources = Resource.objects.filter(external_id__in=external_resource_id)
+
+        storage_actions = []
+        for i, resource in enumerate(resources):
+            resource.amount = amounts[i]
+            action_type = ResourceStorageAction.ActionType.SET
+            storage_actions.append(ResourceStorageAction(value=amounts[i],
                                                          operator=operator,
                                                          resource=resource,
                                                          action_type=action_type))
@@ -291,11 +342,74 @@ class Specifications:
         return spec, list(resources)
 
     @classmethod
-    def specification_create(cls, data):
-        ...
+    def specification_create(cls,
+                             specification_name: str,
+                             product_id: str,
+                             category_name: str,
+                             coefficient: float = None,
+                             use_category_coefficient: bool = False,
+                             resources: list = None,
+                             is_active: bool = True,
+                             user=None):
+        # resources: [{id, amount}]
+        # TODO: check fields
+
+        operator = Operators.get_operator_by_user(user)
+
+        if category_name is not None:
+            category = SpecificationCategory.objects.get_or_create(category_name=category_name)
+        else:
+            category = None
+        specification = Specification.objects.create(specification_name=specification_name,
+                                                     product_id=product_id,
+                                                     category=category,
+                                                     coefficient=coefficient,
+                                                     use_category_coefficient=use_category_coefficient,
+                                                     is_active=is_active)
+        res_spec = []
+
+        if resources is not None:
+            for res in resources:
+                res_spec.append(ResourceSpecification(
+                    specification=specification,
+                    resource_id=res['id'],
+                    amount=res['amount']))
+
+        ResourceSpecification.objects.bulk_create(res_spec)
+
+        if use_category_coefficient:
+            coefficient_action_type = SpecificationCoefficientAction.ActionType.SET_BY_CATEGORY
+        else:
+            coefficient_action_type = SpecificationCoefficientAction.ActionType.SET
+
+        specification_coefficient_action = SpecificationCoefficientAction.objects.create(
+            specification=specification,
+            action_type=coefficient_action_type,
+            value=coefficient,
+            operator=operator
+        )
+
+        specification_service_action = SpecificationServiceAction.objects.create(
+            specification=specification,
+            action_type=SpecificationServiceAction.ActionType.CREATE,
+            operator=operator
+        )
+
+        specification = Specifications.specification(s_id=specification.id)
+
+        return specification, (specification_service_action, specification_coefficient_action)
 
     @classmethod
-    def specification_edit(cls, s_id, data):
+    def specification_edit(cls,
+                           s_id,
+                           specification_name: str,
+                           product_id: str,
+                           category_name: str,
+                           coefficient: float = None,
+                           use_category_coefficient: bool = False,
+                           resources: list = None,
+                           is_active: bool = True,
+                           user=None):
         ...
 
     @classmethod
@@ -354,8 +468,33 @@ class Verify:
 
     @classmethod
     def unverified_resources(cls):
-        ...
+        resources = Resource.objects.raw(f"""
+        SELECT * 
+        FROM {UnverifiedCost._meta.db_table} uc
+        INNER JOIN (
+            SELECT rc.id AS old_cost_id, rc.value AS old_cost_value, rc.resource_id AS resource_id
+            FROM {ResourceCost._meta.db_table} rc
+            ) rc_old
+        ON (uc.last_verified_cost_id = rc_old.old_cost_id)
+        INNER JOIN (
+            SELECT rc.id as new_cost_id, rc.value AS new_cost_value
+            FROM {ResourceCost._meta.db_table} rc
+            ) rc_new
+        ON (uc.new_cost_id = rc_new.new_cost_id)
+        INNER JOIN {Resource._meta.db_table} r
+        ON (r.id = rc_old.resource_id)
+        """)
+        return resources
 
     @classmethod
-    def unverified_specifications(cls, resources=None):
-        ...
+    def unverified_specifications(cls):
+        # TODO: today
+        return Specification.objects.raw(
+            f"""
+        SELECT *
+        FROM {Specification._meta.db_table} s
+        INNER JOIN {ResourceSpecification._meta.db_table} rs
+        ON (s.id = rs.specifiaction_id)
+        INNER JOIN ({cls.unverified_resources()}) unv_res
+        ON (unv_res.id = rs.resource_id)"""
+        )

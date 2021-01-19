@@ -4,8 +4,9 @@ from django.shortcuts import render
 # Create your views here.
 from django.urls import reverse
 
-from .service import Resources, Specifications
-from .forms import ResourceStoragePriceFormSet, ResourceCreateForm
+from .service import Resources, Specifications, Verify
+from .forms import ResourceStoragePriceFormSet, ResourceCreateForm, ResourceEditForm
+from .models import Resource
 
 
 def resources(request):
@@ -16,10 +17,12 @@ def resources(request):
             if form.is_valid():
                 cd = form.cleaned_data
                 if len(cd) != 0:
-                    if cd['new_price'] is not None:
-                        resources_to_change_price.append((cd['external_id'], cd['new_price']))
+                    print(cd['new_cost'])
+                    if cd['new_cost'] is not None:
+                        resources_to_change_price.append((cd['external_id'], cd['new_cost']))
                     if cd['delta_amount'] is not None:
                         resources_to_change_amount.append((cd['external_id'], cd['delta_amount']))
+        print(resources_to_change_price)
         Resources.set_new_costs(list(map(lambda x: x[0], resources_to_change_price)),
                                 list(map(lambda x: float(x[1]), resources_to_change_price)),
                                 user=None)
@@ -57,6 +60,36 @@ def resource_create(request):
                                       amount=float(data.get('amount')),
                                       provider_name=data.get('provider_name').provider_name,
                                       user=request.user)
-            return HttpResponseRedirect(reverse('resource_list'))
+        return HttpResponseRedirect(reverse('resource_list'))
     else:
         return render(request, 'resource_create.html', context={'form': ResourceCreateForm()})
+
+
+def resource_edit(request, r_id):
+    if request.method == 'POST':
+        _, resource = Resources.resource(r_id)
+        form = ResourceEditForm(data=request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            Resources.resource_edit(r_id,
+                                    resource_name=data.get('resource_name'),
+                                    external_id=data.get('external_id'),
+                                    cost=float(data.get('cost')),
+                                    amount=float(data.get('amount')),
+                                    provider_name=data.get('provider_name').provider_name,
+                                    user=request.user)
+        return HttpResponseRedirect(reverse('resource_list'))
+    else:
+        _, resource = Resources.resource(r_id)
+        form = ResourceEditForm(initial={
+            'resource_name': resource.resource_name,
+            'external_id': resource.external_id,
+            'cost': resource.cost,
+            'amount': resource.amount,
+            'provider_name': resource.resource_provider.provider_name
+        })
+        return render(request, 'resource_create.html', context={'form': form})
+
+
+def resource_unverified(request):
+    return render(request, 'resource_unverified.html', context={'resources': Verify.unverified_resources()})

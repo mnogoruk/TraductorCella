@@ -79,18 +79,6 @@ class ResourceCost(CreateGenericModel):
         return f'{self.resource.resource_name} - {self.value}'
 
 
-class UnverifiedCost(models.Model):
-    last_verified_cost = models.ForeignKey(ResourceCost,
-                                           on_delete=models.CASCADE,
-                                           related_name='unverified_cost_as_old')
-    new_cost = models.ForeignKey(ResourceCost,
-                                 on_delete=models.CASCADE,
-                                 related_name='unverified_cost_as_new')
-
-    def __str__(self):
-        return f"{self.last_verified_cost.resource.resource_name} from {self.last_verified_cost.value} to {self.new_cost.value}"
-
-
 class ResourceStorageAction(models.Model):
     class ActionType(models.TextChoices):
         ADD = 'ADD', 'Add'
@@ -221,7 +209,7 @@ class SpecificationCoefficientAction(models.Model):
                                       null=True)
     action_type = models.CharField(max_length=3,
                                    choices=ActionType.choices)
-    value = models.DecimalField(max_digits=8, decimal_places=2)
+    value = models.DecimalField(max_digits=8, decimal_places=2, null=True)
     action_datetime = models.DateTimeField(auto_now_add=True)
     operator = models.ForeignKey(Operator,
                                  on_delete=models.SET_NULL,
@@ -273,6 +261,18 @@ class SpecificationServiceAction(models.Model):
 
     def __str__(self):
         return f"{self.action_type} for {self.specification}"
+
+
+class UnverifiedCost(models.Model):
+    last_verified_cost = models.ForeignKey(ResourceCost,
+                                           on_delete=models.CASCADE,
+                                           related_name='unverified_cost_as_old')
+    new_cost = models.ForeignKey(ResourceCost,
+                                 on_delete=models.CASCADE,
+                                 related_name='unverified_cost_as_new')
+
+    def __str__(self):
+        return f"{self.last_verified_cost.resource.resource_name} from {self.last_verified_cost.value} to {self.new_cost.value}"
 
 
 class UnresolvedProduct(CreateGenericModel):

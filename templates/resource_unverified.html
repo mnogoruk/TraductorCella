@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<table border="1">
+    <tr>
+        <th>Название</th>
+        <th>Поставщик</th>
+        <th>Внешний ID</th>
+        <th>Старая цена</th>
+        <th>Новая цена</th>
+    </tr>
+    {% for resource in resources %}
+        <tr>
+            <td> {{ resource.resource_name }}</td>
+            <td> {{ resource.resource_provider.provider_name }}</td>
+            <td> {{ resource.external_id }}</td>
+            <td> {{ resource.old_cost_value }}</td>
+            <td> {{ resource.new_cost_value }}</td>
+        </tr>
+    {% endfor %}
+
+</table>
+</body>
+</html>
