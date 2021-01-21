@@ -496,9 +496,16 @@ class Verify:
                 spec.category_name as category_name,
                 spec.coefficient as coefficient,
                 spec.product_id as product_id,
-                SUM(res_spec.old_cost) as old_cost,
+                SUM(
+                    CASE 
+                        WHEN res_spec.old_cost IS NOT NULL THEN res_spec.old_cost
+                        ELSE res_spec.new_cost
+                    END) as old_cost,
                 SUM(res_spec.new_cost) as new_cost,
-                SUM(res_spec.old_cost) * spec.coefficient AS old_price,
+                SUM(CASE 
+                        WHEN res_spec.old_cost IS NOT NULL THEN res_spec.old_cost
+                        ELSE res_spec.new_cost
+                    END) * spec.coefficient AS old_price,
                 SUM(res_spec.new_cost) * spec.coefficient AS new_price
         FROM (
             SELECT  s.id as id,
