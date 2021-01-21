@@ -193,7 +193,7 @@ class ResourceSpecification(models.Model):
     amount = models.DecimalField(max_digits=8, decimal_places=3)
 
     def __str__(self):
-        return f"{self.resource.resource_name} - {self.specification.specification_name}"
+        return f"{self.resource} - {self.specification}"
 
 
 class SpecificationCoefficientAction(models.Model):

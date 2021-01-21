@@ -125,3 +125,7 @@ def specification_create(request):
     else:
         return render(request, 'specification_create.html',
                       context={'form': SpecificationCreateForm, 'forms': SpecificationResourceFormSet()})
+
+
+def specification_unverified(request):
+    return render(request, 'specification_unverified.html', context={'specs': Verify.unverified_specifications(), 'res': Verify.unverified_resources()})

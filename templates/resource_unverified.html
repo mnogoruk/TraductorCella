@@ -15,6 +15,7 @@
     </tr>
     {% for resource in resources %}
         <tr>
+            <td>{{ resource.id }}</td>
             <td> {{ resource.resource_name }}</td>
             <td> {{ resource.resource_provider.provider_name }}</td>
             <td> {{ resource.external_id }}</td>

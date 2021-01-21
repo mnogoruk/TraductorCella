@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<table border="1">
+    <tr>
+        <th>Название</th>
+        <th>Поставщик</th>
+        <th>Внешний ID</th>
+        <th>Старая цена</th>
+        <th>Новая цена</th>
+    </tr>
+    {% for r in res %}
+        <tr>
+            <td>{{ r.resource_name }}</td>
+            <td>{{ r.resource_provider.provider_name }}</td>
+            <td>{{ r.external_id }}</td>
+            <td>{{ r.old_cost_value }}</td>
+            <td>{{ r.new_cost_value }}</td>
+        </tr>
+    {% endfor %}
+
+</table>
+<br>
+<br>
+<table border="1">
+    <tr>
+        <th>название</th>
+        <th>ID продукта</th>
+        <th>Название категории</th>
+        <th>коефициент</th>
+        <th>Старая себестоимость</th>
+        <th>Новая себестоимость</th>
+        <th>Старая цена</th>
+        <th>Новая цена</th>
+    </tr>
+    {% for spec in specs %}
+        <tr>
+            <td>{{ spec.specification_name }}</td>
+            <td>{{ spec.product_id }}</td>
+            <td>{{ spec.category_name }}</td>
+            <td>{{ spec.coefficient }}</td>
+            <td>{{ spec.old_cost }}</td>
+            <td>{{ spec.new_cost }}</td>
+            <td>{{ spec.old_price }}</td>
+            <td>{{ spec.new_price }}</td>
+        </tr>
+    {% endfor %}
+</table>
+</body>
+</html>

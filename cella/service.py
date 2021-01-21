@@ -489,11 +489,76 @@ class Verify:
     @classmethod
     def unverified_specifications(cls):
         # TODO: today
-        return Specification.objects.raw(
+        specifications = Specification.objects.raw(
             f"""
-        SELECT *
-        FROM {Specification._meta.db_table} s
-        INNER JOIN {ResourceSpecification._meta.db_table} rs
-        ON (s.id = rs.specifiaction_id)
-        INNER JOIN ({cls.unverified_resources()}) unv_res
-        ON (unv_res.id = rs.resource_id)""")
+        SELECT  spec.id AS id, 
+                spec.specification_name as specification_name,
+                spec.category_name as category_name,
+                spec.coefficient as coefficient,
+                spec.product_id as product_id,
+                SUM(res_spec.old_cost) as old_cost,
+                SUM(res_spec.new_cost) as new_cost,
+                SUM(res_spec.old_cost) * spec.coefficient AS old_price,
+                SUM(res_spec.new_cost) * spec.coefficient AS new_price
+        FROM (
+            SELECT  s.id as id,
+                    s.specification_name AS specification_name,
+                    s.product_id AS product_id,
+                    sc.category_name AS category_name,
+                    CASE
+                        WHEN s.use_category_coefficient = TRUE THEN sc.coefficient
+                        ELSE s.coefficient
+                    END AS coefficient
+            FROM {Specification._meta.db_table} s
+            LEFT JOIN {SpecificationCategory._meta.db_table} sc
+            ON (s.category_id = sc.id)
+            INNER JOIN {ResourceSpecification._meta.db_table} rs
+            ON (s.id = rs.specification_id)
+            INNER JOIN (
+                SELECT r.id as res_id
+                FROM {UnverifiedCost._meta.db_table} uc
+                INNER JOIN (
+                    SELECT rc.id AS old_cost_id, rc.value AS old_cost_value, rc.resource_id AS resource_id
+                    FROM {ResourceCost._meta.db_table} rc
+                    ) rc_old
+                ON (uc.last_verified_cost_id = rc_old.old_cost_id)
+                INNER JOIN (
+                    SELECT rc.id as new_cost_id, rc.value AS new_cost_value
+                    FROM {ResourceCost._meta.db_table} rc
+                    ) rc_new
+                ON (uc.new_cost_id = rc_new.new_cost_id)
+                INNER JOIN {Resource._meta.db_table} r
+                ON (r.id = rc_old.resource_id)
+            ) unv_res
+            ON (unv_res.res_id = rs.resource_id)
+            GROUP BY s.id
+        ) spec
+        LEFT JOIN (
+            SELECT  rs.specification_id AS specification_id,
+                    c.id as cost_id,
+                    uc.old_cost AS old_cost,
+                    c.cost_value AS new_cost
+            FROM {ResourceSpecification._meta.db_table} rs
+            LEFT JOIN {Resource._meta.db_table} r
+            ON (r.id = rs.resource_id)
+            LEFT JOIN (
+                SELECT o.value AS cost_value, o.resource_id, o.created_at, o.id as id
+                FROM {ResourceCost._meta.db_table} o
+                LEFT JOIN {ResourceCost._meta.db_table} b
+                ON o.resource_id = b.resource_id AND o.created_at < b.created_at
+                WHERE b.created_at IS NULL
+                ) c
+            ON (r.id = c.resource_id)
+            LEFT JOIN (
+                SELECT  rc.value as old_cost,
+                        uc.new_cost_id AS new_cost_id
+                FROM {UnverifiedCost._meta.db_table} uc
+                INNER JOIN {ResourceCost._meta.db_table} rc
+                ON (rc.id = uc.last_verified_cost_id)
+            ) uc 
+            ON (uc.new_cost_id = c.id)
+        ) res_spec
+        ON (res_spec.specification_id = spec.id)
+        GROUP BY spec.id
+        """)
+        return specifications
