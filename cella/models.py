@@ -74,6 +74,13 @@ class ResourceAction(models.Model):
         RISE_AMOUNT = 'RSA', 'Rise amount'
         DROP_AMOUNT = 'DRA', 'Drop amount'
 
+    class ActionMessage:
+        CREATE = "Ресурс создан"
+        SET_COST = "Установлена новая цена: {cost_value}"
+        SET_AMOUNT = "Установлена новое количество: {amount_value}"
+        RISE_AMOUNT = "Добавлено {delta_amount} ресуров"
+        DROP_AMOUNT = "Ушло {delta_amount} ресурсов"
+
     resource = models.ForeignKey(Resource,
                                  on_delete=models.CASCADE,
                                  related_name='resource_actions')
