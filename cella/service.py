@@ -1,3 +1,5 @@
+from django.core.exceptions import ObjectDoesNotExist
+
 from .models import (Operator,
                      ResourceProvider,
                      Resource,
@@ -15,10 +17,16 @@ from .models import (Operator,
                      OrderAction)
 from django.db.models import Q, FilteredRelation, Max, F, Case, When, Sum
 from collections import namedtuple
-from django.db import connection
+from django.db import connection, IntegrityError
 
 
-class Operators:
+class Service:
+
+    def __init__(self, request=None):
+        self.request = request
+
+
+class Operators(Service):
 
     @classmethod
     def get_operator_by_user(cls, user):
@@ -31,10 +39,19 @@ class Operators:
         return operator
 
 
-class Resources:
+class Providers(Service):
 
-    def __int__(self, request=None):
-        self.request = request
+    @classmethod
+    def get_by_name(cls, name):
+        return ResourceProvider.objects.get(name=name)
+
+
+class Resources(Service):
+    class ResourceDoesNotExist(ObjectDoesNotExist):
+        pass
+
+    class UniqueField(IntegrityError):
+        pass
 
     def detail(self, r_id):
         # TODO: test
@@ -51,16 +68,21 @@ class Resources:
                cost_value: float = 0,
                amount_value: float = 0,
                provider_name: str = None):
+        if cost_value is None:
+            cost_value = .0
+        if amount_value is None:
+            amount_value = .0
         # TODO: test
         if provider_name is not None:
-            provider = ResourceProvider.objects.get_or_create(provider_name=provider_name)[0]
+            provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
         else:
             provider = None
-
-        resource = Resource.objects.create(resource_name=resource_name,
-                                           external_id=external_id,
-                                           resource_provider=provider)
-
+        try:
+            resource = Resource.objects.create(name=resource_name,
+                                               external_id=external_id,
+                                               provider=provider)
+        except IntegrityError:
+            raise Resources.UniqueField()
         cost = ResourceCost.objects.create(resource=resource,
                                            value=cost_value,
                                            verified=True)
@@ -90,7 +112,9 @@ class Resources:
             )
         ]
         ResourceAction.objects.bulk_create(actions)
-        return resource, (cost, amount), actions
+        resource.cost = cost.value
+        resource.amount = amount.value
+        return resource, actions
 
     def bulk_create(self, data: list):
         # TODO: test, optimize
@@ -110,25 +134,25 @@ class Resources:
         operator = Operators.get_operator_by_user(self.request.user)
 
         if resource_name is not None:
-            data['resource_name'] = resource_name
+            data['name'] = resource_name
             message += f"новое название ресурса: {resource_name}|"
         if external_id is not None:
             data['external_id'] = external_id
             message += f" новое внешение id: {external_id}|"
         if provider_name is not None:
-            data['provider'] = ResourceProvider.objects.get_or_create(provider_name=provider_name)[0]
+            data['provider'] = ResourceProvider.objects.get_or_create(name=provider_name)[0]
             message += f"новый поставщик: {provider_name}"
 
-        resource = Resource.objects.filter(id=r_id).update(**data)
+        Resource.objects.filter(id=r_id).update(**data)
 
         action = ResourceAction.objects.create(
-            resource=resource,
+            resource_id=r_id,
             action_type=ResourceAction.ActionType.UPDATE_FIELDS,
             message=message,
             operator=operator
         )
 
-        return resource, action
+        return self.detail(r_id), action
 
     def set_cost(self, r_id, cost_value):
         # TODO: test
