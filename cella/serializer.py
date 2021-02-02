@@ -5,10 +5,22 @@ from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator
 
 from .service import Providers, Resources
-from .models import Resource
+from .models import Resource, ResourceProvider, ResourceAction
 
 
-class ResourceDetailSerializer(serializers.Serializer):
+class ProviderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ResourceProvider
+        fields = '__all__'
+
+
+class ResourceActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ResourceAction
+        fields = '__all__'
+
+
+class ResourceSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True)
     external_id = serializers.CharField(required=True,
                                         validators=[
@@ -17,15 +29,18 @@ class ResourceDetailSerializer(serializers.Serializer):
                                             )
                                         ]
                                         )
-    provider_name = serializers.CharField(required=False)
+    provider = ProviderSerializer(read_only=True, allow_null=True)
+    provider_name = serializers.CharField(write_only=True, required=False, allow_null=True)
     cost = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
     amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
+    last_change_cost = serializers.DateTimeField('cost_time_stamp', read_only=True)
+    last_change_amount = serializers.DateTimeField('amount_time_stamp', read_only=True)
 
     def to_representation(self, instance):
-        if instance.provider is not None:
+        if instance.provider_id is not None:
             provider = {
-                'id': instance.provider.id,
-                'name': instance.provider.name
+                'id': instance.provider_id,
+                'name': instance.provider_name
             }
         else:
             provider = None
@@ -35,8 +50,11 @@ class ResourceDetailSerializer(serializers.Serializer):
             'external_id': instance.external_id,
             'cost': instance.cost,
             'amount': instance.amount,
-            'provider': provider
+            'provider': provider,
+            'last_change_amount': instance.cost_time_stamp,
+            'last_change_cost': instance.amount_time_stamp,
         }
+
         return data
 
     def create(self, validated_data):
@@ -49,38 +67,6 @@ class ResourceDetailSerializer(serializers.Serializer):
             provider_name=validated_data.get('provider_name')
         )
         return resource
-
-
-class ResourceEditSerializer(serializers.Serializer):
-    name = serializers.CharField(required=False)
-    external_id = serializers.CharField(required=False,
-                                        validators=[
-                                            UniqueValidator(
-                                                queryset=Resource.objects.defer('external_id').all()
-                                            )
-                                        ]
-                                        )
-    provider_name = serializers.CharField(required=False)
-    cost = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
-    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
-
-    def to_representation(self, instance):
-        if instance.provider is not None:
-            provider = {
-                'id': instance.provider.id,
-                'name': instance.provider.name
-            }
-        else:
-            provider = None
-        data = {
-            'id': instance.id,
-            'name': instance.name,
-            'external_id': instance.external_id,
-            'cost': instance.cost,
-            'amount': instance.amount,
-            'provider': provider
-        }
-        return data
 
     def update(self, instance, validated_data):
         service = Resources(request=validated_data.get('request'))
@@ -108,3 +94,7 @@ class ResourceEditSerializer(serializers.Serializer):
             service.set_amount(r_id=instance.id, amount_value=amount)
 
         return resource
+
+    class Meta:
+        model = Resource
+        fields = ['id', 'name', 'external_id', 'provider', 'provider_name', 'cost', 'amount', 'last_change_amount', 'last_change_cost']

@@ -47,7 +47,7 @@ class Resource(models.Model):
 
 
 class ResourceCost(models.Model):
-    resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='costs')
     value = models.DecimalField(max_digits=8, decimal_places=2)
     time_stamp = models.DateTimeField(auto_now=True)
     verified = models.BooleanField(default=False)
@@ -57,7 +57,7 @@ class ResourceCost(models.Model):
 
 
 class ResourceAmount(models.Model):
-    resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='amounts')
     value = models.DecimalField(max_digits=8, decimal_places=2)
     time_stamp = models.DateTimeField(auto_now=True)
 
@@ -69,7 +69,7 @@ class ResourceAction(models.Model):
     class ActionType(models.TextChoices):
         CREATE = 'CRT', 'Create'
         UPDATE_FIELDS = 'UPF', 'Update fields'
-        SET_COST = 'STC', 'Set price'
+        SET_COST = 'STC', 'Set cost'
         SET_AMOUNT = 'STA', 'Set amount'
         RISE_AMOUNT = 'RSA', 'Rise amount'
         DROP_AMOUNT = 'DRA', 'Drop amount'

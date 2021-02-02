@@ -1,4 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models.sql import Query
+
+from .datastructures import CompareJoin
 
 from .models import (Operator,
                      ResourceProvider,
@@ -15,7 +18,7 @@ from .models import (Operator,
                      Order,
                      OrderSpecification,
                      OrderAction)
-from django.db.models import Q, FilteredRelation, Max, F, Case, When, Sum
+from django.db.models import Q, FilteredRelation, Max, F, Case, When, Sum, QuerySet, ForeignObject
 from collections import namedtuple
 from django.db import connection, IntegrityError
 
@@ -91,13 +94,14 @@ class Resources(Service):
 
         operator = Operators.get_operator_by_user(self.request.user)
 
+        ResourceAction(
+            resource=resource,
+            action_type=ResourceAction.ActionType.CREATE,
+            message=ResourceAction.ActionType.CREATE,
+            operator=operator
+        ).save()
+
         actions = [
-            ResourceAction(
-                resource=resource,
-                action_type=ResourceAction.ActionType.CREATE,
-                message=ResourceAction.ActionType.CREATE,
-                operator=operator
-            ),
             ResourceAction(
                 resource=resource,
                 action_type=ResourceAction.ActionType.SET_COST,
@@ -109,8 +113,9 @@ class Resources(Service):
                 action_type=ResourceAction.ActionType.SET_AMOUNT,
                 message=ResourceAction.ActionMessage.SET_AMOUNT.format(amount_value=amount_value),
                 operator=operator
-            )
+            ),
         ]
+
         ResourceAction.objects.bulk_create(actions)
         resource.cost = cost.value
         resource.amount = amount.value
@@ -223,73 +228,82 @@ class Resources(Service):
 
     def list(self):
         # TODO: test
-        return Resource.objects.raw(
+        query = Resource.objects.raw(
             f"""
-            SELECT * 
-            FROM {Resource._meta.db_table} resource
-            LEFT JOIN (
-                SELECT  {ResourceProvider._meta.db_table}.id AS provider_id,
-                        {ResourceProvider._meta.db_table}.name AS provider_name
-                FROM {ResourceProvider._meta.db_table}
-            ) provider
-            ON resource.provider_id = provider.id
-            LEFT JOIN (
-                SELECT o.value AS cost
-                FROM {ResourceCost._meta.db_table} o 
-                LEFT JOIN {ResourceCost._meta.db_table} b
-                ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
-                WHERE b.time_stamp IS NULL
-            ) cost
-            ON cost.resource_id = resource.id
-            LEFT JOIN (
-                SELECT o.value AS amount
-                FROM {ResourceAmount._meta.db_table} o 
-                LEFT JOIN {ResourceAmount._meta.db_table} b
-                ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
-                WHERE b.time_stamp IS NULL AND o.verified = TRUE
-            ) amount             
-            ON amount.resource_id = resource.id
-            """
+                SELECT * 
+                FROM {Resource._meta.db_table} resource
+                LEFT JOIN (
+                    SELECT  {ResourceProvider._meta.db_table}.id AS provider_id,
+                            {ResourceProvider._meta.db_table}.name AS provider_name
+                    FROM {ResourceProvider._meta.db_table}
+                ) provider
+                ON resource.provider_id = provider.provider_id
+                LEFT JOIN (
+                    SELECT  o.value AS cost,
+                            o.resource_id AS resource_id,
+                            o.time_stamp AS cost_time_stamp
+                    FROM {ResourceCost._meta.db_table} o 
+                    LEFT JOIN {ResourceCost._meta.db_table} b
+                    ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
+                    WHERE b.time_stamp IS NULL
+                ) cost
+                ON cost.resource_id = resource.id
+                LEFT JOIN (
+                    SELECT  o.value AS amount,
+                            o.resource_id AS resource_id,
+                            o.time_stamp AS amount_time_stamp
+                    FROM {ResourceAmount._meta.db_table} o 
+                    LEFT JOIN {ResourceAmount._meta.db_table} b
+                    ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
+                    WHERE b.time_stamp IS NULL
+                ) amount             
+                ON amount.resource_id = resource.id
+                """
         )
+
+        return query
 
     def unverified(self):
         # TODO: test, optimize
         return Resource.objects.raw(
             f"""
-            SELECT * 
-            FROM {Resource._meta.db_table} resource
-            LEFT JOIN (
-                SELECT  {ResourceProvider._meta.db_table}.id AS provider_id,
-                        {ResourceProvider._meta.db_table}.name AS provider_name
-                FROM {ResourceProvider._meta.db_table}
-            ) provider
-            ON resource.provider_id = provider.id
-            INNER JOIN (
-                SELECT o.value AS new_cost_value
-                FROM {ResourceCost._meta.db_table} o 
-                LEFT JOIN {ResourceCost._meta.db_table} b
-                ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
-                WHERE b.time_stamp IS NULL AND o.verified = FALSE
-            ) new_cost
-            ON new_cost.resource_id = resource.id
-            LEFT JOIN (
-                SELECT o.value AS old_cost_value
-                FROM {ResourceCost._meta.db_table} o 
-                LEFT JOIN {ResourceCost._meta.db_table} b
-                ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
-                WHERE b.time_stamp IS NULL AND o.verified = TRUE
-            ) old_cost
-            ON old_cost.resource_id = resource.id
-            LEFT JOIN (
-                SELECT o.value AS amount
-                FROM {ResourceAmount._meta.db_table} o 
-                LEFT JOIN {ResourceAmount._meta.db_table} b
-                ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
-                WHERE b.time_stamp IS NULL AND o.verified = TRUE
-            ) amount             
-            ON amount.resource_id = resource.id
-            """
+                SELECT * 
+                FROM {Resource._meta.db_table} resource
+                LEFT JOIN (
+                    SELECT  {ResourceProvider._meta.db_table}.id AS provider_id,
+                            {ResourceProvider._meta.db_table}.name AS provider_name
+                    FROM {ResourceProvider._meta.db_table}
+                ) provider
+                ON resource.provider_id = provider.id
+                INNER JOIN (
+                    SELECT o.value AS new_cost_value
+                    FROM {ResourceCost._meta.db_table} o 
+                    LEFT JOIN {ResourceCost._meta.db_table} b
+                    ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
+                    WHERE b.time_stamp IS NULL AND o.verified = FALSE
+                ) new_cost
+                ON new_cost.resource_id = resource.id
+                LEFT JOIN (
+                    SELECT o.value AS old_cost_value
+                    FROM {ResourceCost._meta.db_table} o 
+                    LEFT JOIN {ResourceCost._meta.db_table} b
+                    ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
+                    WHERE b.time_stamp IS NULL AND o.verified = TRUE
+                ) old_cost
+                ON old_cost.resource_id = resource.id
+                LEFT JOIN (
+                    SELECT o.value AS amount
+                    FROM {ResourceAmount._meta.db_table} o 
+                    LEFT JOIN {ResourceAmount._meta.db_table} b
+                    ON o.resource_id = b.resource_id AND o.time_stamp < b.time_stamp
+                    WHERE b.time_stamp IS NULL AND o.verified = TRUE
+                ) amount             
+                ON amount.resource_id = resource.id
+                """
         )
+
+    def actions(self, r_id):
+        return ResourceAction.objects.filter(resource_id=r_id).order_by('-time_stamp')
 
 # @classmethod
 #     def resource_list(cls):
