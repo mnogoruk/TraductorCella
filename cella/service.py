@@ -1,26 +1,12 @@
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models.sql import Query
-
-from .datastructures import CompareJoin
 
 from .models import (Operator,
                      ResourceProvider,
                      Resource,
                      ResourceCost,
                      ResourceAmount,
-                     ResourceAction,
-                     SpecificationCategory,
-                     Specification,
-                     SpecificationPrice,
-                     SpecificationAction,
-                     ResourceSpecification,
-                     ResourceSpecificationAssembled,
-                     Order,
-                     OrderSpecification,
-                     OrderAction)
-from django.db.models import Q, FilteredRelation, Max, F, Case, When, Sum, QuerySet, ForeignObject
-from collections import namedtuple
-from django.db import connection, IntegrityError
+                     ResourceAction)
+from django.db import IntegrityError
 
 
 class Service:
@@ -226,7 +212,7 @@ class Resources(Service):
             ret.append(self.change_amount(**amount))
         return ret
 
-    def list(self):
+    def list(self, filtering=None, ordering=None, searching=None):
         # TODO: test
         query = Resource.objects.raw(
             f"""
@@ -258,6 +244,8 @@ class Resources(Service):
                     WHERE b.time_stamp IS NULL
                 ) amount             
                 ON amount.resource_id = resource.id
+                {f'WHERE {searching}' if searching is not None else ''}
+                {f'ORDER BY {", ".join(ordering)}' if ordering is not None else ''}
                 """
         )
 
