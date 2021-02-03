@@ -102,14 +102,36 @@ class ResourceSerializer(serializers.ModelSerializer):
             'last_change_cost']
 
 
+class ResourceShortListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Resource
+        fields = ['id', 'name', 'external_id']
+
+
 class SpecificationCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = SpecificationCategory
         fields = '__all__'
 
 
+class SpecificationResource(serializers.Serializer):
+    resource = ResourceSerializer()
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2)
+
+
 class SpecificationDetailSerializer(serializers.ModelSerializer):
-    resources = ResourceSerializer(many=True)
+    resources = SpecificationResource(many=True)
+    price = serializers.DecimalField(max_digits=8, decimal_places=2)
+    price_time_stamp = serializers.DateTimeField()
+
+    class Meta:
+        model = Specification
+        fields = '__all__'
+
+
+class SpecificationListSerializer(serializers.ModelSerializer):
+    category = SpecificationCategorySerializer()
+    prime_cost = serializers.DecimalField(max_digits=8, decimal_places=2)
     price = serializers.DecimalField(max_digits=8, decimal_places=2)
     price_time_stamp = serializers.DateTimeField()
 

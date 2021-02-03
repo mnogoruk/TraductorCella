@@ -1,5 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max, Q, Subquery, OuterRef, Exists
+from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper
 
 from .models import (Operator,
                      ResourceProvider,
@@ -13,7 +13,7 @@ from .models import (Operator,
                      SpecificationCategory,
                      ResourceSpecificationAssembled,
                      ResourceSpecification)
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 
 class Service:
@@ -233,6 +233,12 @@ class Resources(Service):
 
         return query
 
+    def shortlist(self):
+        return Resource.objects.all()
+
+    def providers(self):
+        return ResourceProvider.objects.all()
+
     def with_unverified_cost(self):
         cost_ver_qr = ResourceCost.objects.filter(resource=OuterRef('pk'), verified=True).order_by('-time_stamp')
         cost_unver_qr = ResourceCost.objects.filter(resource=OuterRef('pk'), verified=False).order_by('-time_stamp')
@@ -247,6 +253,12 @@ class Resources(Service):
         ).filter(unverified=True)
         return query
 
+    def verify_cost(self, r_id):
+        with transaction.atomic():
+            resource = Resource.objects.get(id=r_id)
+            costs = ResourceCost.objects.filter(resource=resource, verified=False).update(verified=True)
+        return costs
+
     def actions(self, r_id):
         return ResourceAction.objects.filter(resource_id=r_id).order_by('-time_stamp')
 
@@ -258,12 +270,33 @@ class Specifications(Service):
 
         service = Resources(self.request)
         query_res_spec = ResourceSpecification.objects.filter(specification=specification, resource=OuterRef('pk'))
-        resources = service.list().annotate(res_spec_ex=Exists(query_res_spec.values('id'))).filter(res_spec_ex=True)
-
-        price = SpecificationPrice.objects.filter(specification=specification).latest('time_stamp')
-
+        resources = service.list().annotate(
+            res_spec_ex=Exists(query_res_spec.values('id')),
+            needed_amount=Subquery(query_res_spec.values('amount')[:1])).filter(res_spec_ex=True)
+        try:
+            price = SpecificationPrice.objects.filter(specification=specification).latest('time_stamp')
+            specification.price = price.value
+            specification.price_time_stamp = price.time_stamp
+        except SpecificationPrice.DoesNotExist:
+            specification.price = None
+            specification.price_time_stamp = None
+        resources = [{'resource': resource, 'amount': resource.needed_amount} for resource in resources]
         specification.resources = resources
-        specification.price = price.value
-        specification.price_time_stamp = price.time_stamp
 
         return specification
+
+    def list(self):
+        query_cost = ResourceCost.objects.filter(resource_id=OuterRef('resource_id')).order_by('-time_stamp')
+        query_res_spec = ResourceSpecification.objects.filter(specification=OuterRef('pk')).values(
+            'specification_id').annotate(
+            total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')))
+        query_price = SpecificationPrice.objects.filter(specification=OuterRef('pk')).order_by('-time_stamp')
+        specifications = Specification.objects.select_related('category').annotate(
+            prime_cost=Subquery(query_res_spec.values('total_cost')[:2]),
+            price=Subquery(query_price.values('value')[:1]),
+            price_time_stamp=Subquery(query_price.values('time_stamp')[:1])
+        )
+        return specifications
+
+    def categories(self):
+        return SpecificationCategory.objects.all()
