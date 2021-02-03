@@ -47,7 +47,7 @@ class Resource(models.Model):
 
 
 class ResourceCost(models.Model):
-    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='costs')
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
     value = models.DecimalField(max_digits=8, decimal_places=2)
     time_stamp = models.DateTimeField(auto_now=True)
     verified = models.BooleanField(default=False)

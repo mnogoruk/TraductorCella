@@ -1,8 +1,10 @@
 from django.http import Http404
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, UpdateAPIView, ListAPIView
+from rest_framework import filters
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, UpdateAPIView, ListAPIView, RetrieveUpdateAPIView
 
+from .generic.views import ForRawQueryViewMixin
 from .service import Resources
-from .serializer import ResourceSerializer, ResourceActionSerializer
+from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer
 from .models import Resource
 from .utils.pagination import StandardResultsSetPagination
 
@@ -29,7 +31,7 @@ class ResourceCreateView(CreateAPIView):
         serializer.save(request=self.request)
 
 
-class ResourceUpdateView(UpdateAPIView):
+class ResourceUpdateView(RetrieveUpdateAPIView):
     serializer_class = ResourceSerializer
 
     def perform_update(self, serializer):
@@ -47,58 +49,32 @@ class ResourceUpdateView(UpdateAPIView):
         return resource
 
 
-class ResourceListView(ListAPIView):
-    serializer_class = ResourceSerializer
-    pagination_class = StandardResultsSetPagination
-    ordering_fields = {
-        'name',
-        'last_change_amount',
-        'last_change_cost',
-        'cost',
-        'amount',
-        'provider_name',
-        'external_id',
-        'id'
-    }
-    searching_fields = {
-        'name',
-        'external_id',
-        'provider_name',
-        'id'
-    }
-
-    def searching_expression(self, searching):
-        searching_exp = f" LIKE '%{searching}%' OR ".join(self.searching_fields) + f" LIKE '%{searching}%'"
-        return searching_exp
-
-    def ordering_expression(self, ordering):
-        ordering = ordering.strip(',').split(',')
-        order_exp = []
-        for ordering_field in ordering:
-
-            if ordering_field.startswith('-'):
-                ordering_field = ordering_field.replace('-', '')
-
-                if ordering_field in self.ordering_fields:
-                    order_exp.append(f"{ordering_field} DESC")
-
-            if ordering_field in self.ordering_fields:
-                order_exp.append(f"{ordering_field}")
-        return order_exp
+class ResourceWithUnverifiedCostsView(ListAPIView):
+    serializer_class = ResourceWithUnverifiedCostSerializer
 
     def get_queryset(self):
         service = Resources(self.request)
-        ordering = self.request.query_params.get('ordering', None)
-        searching = self.request.query_params.get('searching', None)
-        filtering = self.request.query_params.get('filtering', None)
+        return service.with_unverified_cost()
 
-        if ordering is not None:
-            ordering = self.ordering_expression(ordering)
 
-        if searching is not None:
-            searching = self.searching_expression(searching)
+class ResourceListView(ListAPIView, ForRawQueryViewMixin):
+    serializer_class = ResourceSerializer
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'id', 'provider__name']
+    ordering_fields = [
+        'last_change_amount',
+        'last_change_cost',
+        'name',
+        'external_id',
+        'provider__name',
+        'cost',
+        'amount'
+    ]
 
-        return service.list(ordering=ordering, searching=searching)
+    def get_queryset(self):
+        service = Resources(self.request)
+        return service.list()
 
 
 class ResourceActionsView(ListAPIView):

@@ -20,6 +20,20 @@ class ResourceActionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ResourceWithUnverifiedCostSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(read_only=True)
+    external_id = serializers.CharField(read_only=True)
+    provider = ProviderSerializer(read_only=True, allow_null=True)
+    old_cost = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+    new_cost = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
+    unverified = serializers.BooleanField()
+
+    class Meta:
+        model = Resource
+        fields = ['id', 'name', 'external_id', 'provider', 'old_cost', 'new_cost', 'amount', 'unverified']
+
+
 class ResourceSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True)
     external_id = serializers.CharField(required=True,
@@ -33,29 +47,8 @@ class ResourceSerializer(serializers.ModelSerializer):
     provider_name = serializers.CharField(write_only=True, required=False, allow_null=True)
     cost = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
     amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
-    last_change_cost = serializers.DateTimeField('cost_time_stamp', read_only=True)
-    last_change_amount = serializers.DateTimeField('amount_time_stamp', read_only=True)
-
-    def to_representation(self, instance):
-        if instance.provider_id is not None:
-            provider = {
-                'id': instance.provider_id,
-                'name': instance.provider_name
-            }
-        else:
-            provider = None
-        data = {
-            'id': instance.id,
-            'name': instance.name,
-            'external_id': instance.external_id,
-            'cost': instance.cost,
-            'amount': instance.amount,
-            'provider': provider,
-            'last_change_amount': instance.cost_time_stamp,
-            'last_change_cost': instance.amount_time_stamp,
-        }
-
-        return data
+    last_change_cost = serializers.DateTimeField(read_only=True)
+    last_change_amount = serializers.DateTimeField(read_only=True)
 
     def create(self, validated_data):
         service = Resources(request=validated_data.get('request'))
@@ -97,4 +90,13 @@ class ResourceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Resource
-        fields = ['id', 'name', 'external_id', 'provider', 'provider_name', 'cost', 'amount', 'last_change_amount', 'last_change_cost']
+        fields = [
+            'id',
+            'name',
+            'external_id',
+            'provider',
+            'provider_name',
+            'cost',
+            'amount',
+            'last_change_amount',
+            'last_change_cost']
