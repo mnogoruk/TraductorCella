@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'whitenoise.runserver_nostatic',
+    'whitenoise',
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
@@ -93,11 +93,9 @@ WSGI_APPLICATION = 'TraductorCella.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
-DATABASES = {
-    'default': django_heroku.dj_database_url.config(
-        default=config('DATABASE_URL')
-    )
-}
+DATABASES = {}
+DATABASES['default'] = django_heroku.dj_database_url.config(conn_max_age=600)
+
 options = DATABASES['default'].get('OPTIONS', {})
 options.pop('sslmode', None)
 # Password validation
