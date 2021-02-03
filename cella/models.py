@@ -113,13 +113,14 @@ class Specification(models.Model):
                                  null=True,
                                  blank=True)
     is_active = models.BooleanField(default=True)
+    # resources = models.ManyToManyField(Resource, through='ResourceSpecification')
 
     def __str__(self):
         return f"{self.name}"
 
 
 class SpecificationPrice(models.Model):
-    specification = models.ForeignKey(Resource, on_delete=models.CASCADE)
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE)
     value = models.DecimalField(max_digits=8, decimal_places=2)
     time_stamp = models.DateTimeField(auto_now=True)
     verified = models.BooleanField(default=False)
@@ -152,8 +153,8 @@ class SpecificationAction(models.Model):
 
 
 class ResourceSpecification(models.Model):
-    resource = models.ForeignKey(Resource, on_delete=models.SET_NULL, null=True)
-    specification = models.ForeignKey(Specification, on_delete=models.SET_NULL, null=True)
+    resource = models.ForeignKey(Resource, on_delete=models.SET_NULL, null=True, related_name='res_spec')
+    specification = models.ForeignKey(Specification, on_delete=models.SET_NULL, null=True, related_name='res_spec')
     amount = models.DecimalField(max_digits=8, decimal_places=2)
 
     def __str__(self):

@@ -3,9 +3,10 @@ from rest_framework import filters
 from rest_framework.generics import CreateAPIView, RetrieveAPIView, UpdateAPIView, ListAPIView, RetrieveUpdateAPIView
 
 from .generic.views import ForRawQueryViewMixin
-from .service import Resources
-from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer
-from .models import Resource
+from .service import Resources, Specifications
+from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer, \
+    SpecificationDetailSerializer
+from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
 
 
@@ -84,3 +85,18 @@ class ResourceActionsView(ListAPIView):
         service = Resources(self.request)
 
         return service.actions(self.kwargs['r_id'])
+
+
+class SpecificationDetailView(RetrieveAPIView):
+    serializer_class = SpecificationDetailSerializer
+
+    def get_object(self):
+        s_id = self.kwargs['s_id']
+        service = Specifications(self.request)
+        try:
+            specification = service.detail(s_id)
+        except Specification.DoesNotExist:
+            raise Http404()
+        self.check_object_permissions(request=self.request, obj=specification)
+
+        return specification

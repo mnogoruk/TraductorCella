@@ -5,7 +5,7 @@ from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator
 
 from .service import Providers, Resources
-from .models import Resource, ResourceProvider, ResourceAction
+from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory
 
 
 class ProviderSerializer(serializers.ModelSerializer):
@@ -100,3 +100,19 @@ class ResourceSerializer(serializers.ModelSerializer):
             'amount',
             'last_change_amount',
             'last_change_cost']
+
+
+class SpecificationCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SpecificationCategory
+        fields = '__all__'
+
+
+class SpecificationDetailSerializer(serializers.ModelSerializer):
+    resources = ResourceSerializer(many=True)
+    price = serializers.DecimalField(max_digits=8, decimal_places=2)
+    price_time_stamp = serializers.DateTimeField()
+
+    class Meta:
+        model = Specification
+        fields = '__all__'
