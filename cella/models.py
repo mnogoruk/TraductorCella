@@ -98,7 +98,7 @@ class ResourceAction(models.Model):
 
 class SpecificationCategory(models.Model):
     name = models.CharField(max_length=100)
-    coefficient = models.DecimalField(max_digits=8, decimal_places=2)
+    coefficient = models.DecimalField(max_digits=8, decimal_places=2, null=True)
 
     def __str__(self):
         return self.name
@@ -113,6 +113,7 @@ class Specification(models.Model):
                                  null=True,
                                  blank=True)
     is_active = models.BooleanField(default=True)
+
     # resources = models.ManyToManyField(Resource, through='ResourceSpecification')
 
     def __str__(self):

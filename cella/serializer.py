@@ -4,7 +4,7 @@ from collections import OrderedDict
 from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator
 
-from .service import Providers, Resources
+from .service import Providers, Resources, Specifications
 from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory
 
 
@@ -119,14 +119,35 @@ class SpecificationResource(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=8, decimal_places=2)
 
 
+class SpecificationResourceCreateSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2)
+    id = serializers.IntegerField()
+
+
 class SpecificationDetailSerializer(serializers.ModelSerializer):
-    resources = SpecificationResource(many=True)
-    price = serializers.DecimalField(max_digits=8, decimal_places=2)
-    price_time_stamp = serializers.DateTimeField()
+    resources = SpecificationResource(many=True, read_only=True)
+    price = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    price_time_stamp = serializers.DateTimeField(read_only=True)
+    category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    category = SpecificationCategorySerializer(read_only=True, required=False)
+    is_active = serializers.BooleanField(read_only=True)
+    resources_create = SpecificationResourceCreateSerializer(many=True, write_only=True)
 
     class Meta:
         model = Specification
         fields = '__all__'
+
+    def create(self, validated_data):
+        print(validated_data)
+        spec = Specifications.create(
+            name=validated_data['name'],
+            product_id=validated_data['product_id'],
+            price=validated_data['price'],
+            resources=validated_data['resources_create'],
+            category_name=validated_data['category_name'],
+            user=validated_data['request'].user
+        )
+        return spec
 
 
 class SpecificationListSerializer(serializers.ModelSerializer):
@@ -138,3 +159,5 @@ class SpecificationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Specification
         fields = '__all__'
+
+

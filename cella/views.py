@@ -166,3 +166,10 @@ class SpecificationCategoryListView(ListAPIView):
     def get_queryset(self):
         service = Specifications(self.request)
         return service.categories()
+
+
+class SpecificationCreateView(CreateAPIView):
+    serializer_class = SpecificationDetailSerializer
+
+    def perform_create(self, serializer):
+        return serializer.save(request=self.request)

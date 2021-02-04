@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper
 
@@ -300,3 +302,77 @@ class Specifications(Service):
 
     def categories(self):
         return SpecificationCategory.objects.all()
+
+    @classmethod
+    def create(cls,
+               name: str,
+               product_id: str,
+               price: float = None,
+               resources: List[Dict[str, str]] = None,
+               category_name: str = None,
+               user=None):
+
+        operator = Operators.get_operator_by_user(user)
+
+        if price is None:
+            price = 0
+        if category_name is not None:
+            category = SpecificationCategory.objects.get_or_create(name=category_name)[0]
+        else:
+            category = None
+        deactivated = False
+        if Specification.objects.filter(product_id=product_id, is_active=True).exists():
+            s = Specification.objects.filter(product_id=product_id).get(is_active=True)
+            s.is_active = False
+            s.save()
+            SpecificationAction.objects.create(
+                specification=s,
+                action_type=SpecificationAction.ActionType.DEACTIVATE,
+                operator=operator
+            )
+            deactivated = True
+        specification = Specification.objects.create(
+            name=name,
+            product_id=product_id,
+            category=category,
+            is_active=True
+        )
+        res_specs = []
+        if resources is not None and len(resources) != 0:
+            for resource in resources:
+                res_specs.append(
+                    ResourceSpecification(
+                        resource_id=resource['id'],
+                        amount=resource['amount'],
+                        specification=specification
+                    )
+                )
+            res_specs = ResourceSpecification.objects.bulk_create(res_specs)
+
+        SpecificationAction.objects.create(
+            specification=specification,
+            action_type=SpecificationAction.ActionType.CREATE,
+            operator=operator
+        )
+
+        if price is not None:
+            price = SpecificationPrice.objects.create(
+                specification=specification,
+                value=price,
+                verified=True
+            )
+            SpecificationAction.objects.create(
+                specification=specification,
+                action_type=SpecificationAction.ActionType.SET_PRICE,
+                operator=operator
+            )
+            specification.price = price.value
+            specification.price_time_stamp = price.time_stamp
+            specification.resources = res_specs
+        else:
+            price = None
+            specification.price = None
+            specification.price_time_stamp = None
+        specification.resources = res_specs
+
+        return specification

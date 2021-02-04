@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import ResourceDetailView, ResourceCreateView, ResourceUpdateView, ResourceListView, ResourceActionsView, \
     ResourceWithUnverifiedCostsView, SpecificationDetailView, SpecificationListView, ResourceSetCost, \
-    ResourceVerifyCost, ResourceShortListView, ProviderListView, SpecificationCategoryListView
+    ResourceVerifyCost, ResourceShortListView, ProviderListView, SpecificationCategoryListView, SpecificationCreateView
 
 urlpatterns = [
 
@@ -18,6 +18,7 @@ urlpatterns = [
 
     path('specification/<int:s_id>/', SpecificationDetailView.as_view()),
     path('specification/list/', SpecificationListView.as_view()),
-    path('specification/categories/', SpecificationCategoryListView.as_view())
+    path('specification/categories/', SpecificationCategoryListView.as_view()),
+    path('specification/create/', SpecificationCreateView.as_view())
 
 ]
