@@ -2,7 +2,7 @@ from django.urls import path
 from .views import ResourceDetailView, ResourceCreateView, ResourceUpdateView, ResourceListView, ResourceActionsView, \
     ResourceWithUnverifiedCostsView, SpecificationDetailView, SpecificationListView, ResourceSetCost, \
     ResourceVerifyCost, ResourceShortListView, ProviderListView, SpecificationCategoryListView, SpecificationCreateView, \
-    SpecificationEditView, ResourceAddAmount, FileUploadView
+    SpecificationEditView, ResourceAddAmount, ResourceExelUpload
 
 urlpatterns = [
 
@@ -17,12 +17,13 @@ urlpatterns = [
     path('resource/shortlist/', ResourceShortListView.as_view()),
     path('resource/providers/', ProviderListView.as_view()),
     path('resource/add-amount/', ResourceAddAmount.as_view()),
+    path('resource/upload/', ResourceExelUpload.as_view()),
 
     path('specification/<int:s_id>/', SpecificationDetailView.as_view()),
     path('specification/list/', SpecificationListView.as_view()),
     path('specification/categories/', SpecificationCategoryListView.as_view()),
     path('specification/create/', SpecificationCreateView.as_view()),
     path('specification/edit/<int:s_id>/',SpecificationEditView.as_view()),
-    path('file/', FileUploadView.as_view())
+
 
 ]

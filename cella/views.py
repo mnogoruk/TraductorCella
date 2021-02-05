@@ -1,12 +1,11 @@
 from django.http import Http404
 from rest_framework import filters, status
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView, UpdateAPIView
-from rest_framework.parsers import FileUploadParser
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 import pandas as pd
 
-from .generic.views import ForRawQueryViewMixin
+
 from .service import Resources, Specifications
 from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer, \
     SpecificationDetailSerializer, SpecificationListSerializer, ResourceShortSerializer, ProviderSerializer, \
@@ -198,11 +197,26 @@ class SpecificationEditView(RetrieveUpdateAPIView):
         return Specification.objects.get(id=self.kwargs['s_id'])
 
 
-class FileUploadView(CreateAPIView):
+class ResourceExelUpload(CreateAPIView):
     serializer_class = FileSerializer
 
     def post(self, request, *args, **kwargs):
         file = request.FILES['file']
         excel = pd.read_excel(file)
-        print(excel)
+        try:
+            data = []
+            for row in range(excel.shape[0]):
+                r = excel.iloc[row]
+                data.append({
+                    'resource_name': r['Наименование'].strip(),
+                    'external_id': r['ID'].strip(),
+                    'cost_value': float(r['Цена']),
+                    'amount_value': float(r['Количество']),
+                    'provider_name': r['Поставщик'].strip()
+                })
+            service = Resources(request)
+            service.bulk_create(data=data)
+        except Exception as ex:
+            return Response(data={'detail': 'Ошибка обработки файла'},
+                            status=status.HTTP_400_BAD_REQUEST)
         return super().post(request, *args, **kwargs)
