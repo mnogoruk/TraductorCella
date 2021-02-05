@@ -515,3 +515,27 @@ class Specifications(Service):
 
         return specification
 
+    @classmethod
+    def set_price(cls, s_id, price: float, user=None):
+        coefficient = SpecificationCoefficient.objects.create(specification_id=s_id, value=price)
+        SpecificationAction.objects.create(
+            specification_id=s_id,
+            action_type=SpecificationAction.ActionType.SET_COEFFICIENT,
+            operator=Operators.get_operator_by_user(user)
+        )
+        return coefficient
+
+    @classmethod
+    def set_category(cls, ids: List, category_id):
+        category = SpecificationCategory.objects.get(id=category_id)
+        if category.coefficient is not None:
+            for s_id in ids:
+                SpecificationCoefficient.objects.create(
+                    specification_id=s_id,
+                    value=category.coefficient
+                )
+        Specification.objects.filter(id__in=ids).update(category=category)
+
+class Order(Service):
+
+    pass
