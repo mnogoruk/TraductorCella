@@ -1,13 +1,8 @@
 from rest_framework import serializers
-from collections import OrderedDict
-
-from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator
 
-from .service import Providers, Resources, Specifications
-from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory
-
-
+from .service import Resources, Specifications
+from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory, File
 class ProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ResourceProvider
@@ -102,10 +97,12 @@ class ResourceSerializer(serializers.ModelSerializer):
             'last_change_cost']
 
 
-class ResourceShortListSerializer(serializers.ModelSerializer):
+class ResourceShortSerializer(serializers.ModelSerializer):
+    cost = serializers.DecimalField(max_digits=8, decimal_places=2)
+
     class Meta:
         model = Resource
-        fields = ['id', 'name', 'external_id']
+        fields = ['id', 'name', 'external_id', 'cost']
 
 
 class SpecificationCategorySerializer(serializers.ModelSerializer):
@@ -114,31 +111,42 @@ class SpecificationCategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class SpecificationResource(serializers.Serializer):
-    resource = ResourceSerializer()
+class SpecificationResourceSerializer(serializers.Serializer):
+    resource = ResourceShortSerializer()
     amount = serializers.DecimalField(max_digits=8, decimal_places=2)
 
+    def update(self, instance, validated_data):
+        pass
 
-class SpecificationResourceCreateSerializer(serializers.Serializer):
+    def create(self, validated_data):
+        pass
+
+
+class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=8, decimal_places=2)
     id = serializers.IntegerField()
 
+    def update(self, instance, validated_data):
+        pass
+
+    def create(self, validated_data):
+        pass
+
 
 class SpecificationDetailSerializer(serializers.ModelSerializer):
-    resources = SpecificationResource(many=True, read_only=True)
+    resources = SpecificationResourceSerializer(many=True, read_only=True)
     price = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     price_time_stamp = serializers.DateTimeField(read_only=True)
     category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     category = SpecificationCategorySerializer(read_only=True, required=False)
     is_active = serializers.BooleanField(read_only=True)
-    resources_create = SpecificationResourceCreateSerializer(many=True, write_only=True)
+    resources_create = SpecificationResourceCreateUpdateSerializer(many=True, write_only=True)
 
     class Meta:
         model = Specification
         fields = '__all__'
 
     def create(self, validated_data):
-        print(validated_data)
         spec = Specifications.create(
             name=validated_data['name'],
             product_id=validated_data['product_id'],
@@ -161,3 +169,27 @@ class SpecificationListSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class SpecificationEditSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=False, allow_null=True)
+    product_id = serializers.CharField(required=False, allow_null=True)
+    category_name = serializers.CharField(required=False, allow_null=True, write_only=True)
+    price = serializers.DecimalField(required=False, allow_null=True, max_digits=8, decimal_places=2)
+    resource_to_add = SpecificationResourceCreateUpdateSerializer(required=False, many=True, default=[],
+                                                                  write_only=True)
+    resource_to_delete = serializers.ListField(required=False, default=[], write_only=True)
+    resources = SpecificationResourceSerializer(many=True, read_only=True)
+    category = SpecificationCategorySerializer(read_only=True)
+
+    def update(self, instance, validated_data):
+        return Specifications.edit(instance, **validated_data)
+
+    class Meta:
+        model = Specification
+        fields = '__all__'
+
+
+class FileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = File
+        fields = '__all__'

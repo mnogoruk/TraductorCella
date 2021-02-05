@@ -136,7 +136,7 @@ class SpecificationAction(models.Model):
         DEACTIVATE = 'DCT', 'Deactivate'
         ACTIVATE = 'ACT', 'Activate'
         SET_PRICE = 'STP', 'Set price'
-        UPDATE_FIELDS = 'UPF', 'Update fields'
+        UPDATE = 'UPD', 'Update'
 
     specification = models.ForeignKey(Specification,
                                       on_delete=models.SET_NULL,
@@ -205,3 +205,9 @@ class OrderAction(models.Model):
 
     def __str__(self):
         return f"{self.action_type} for {self.order}"
+
+
+class File(models.Model):
+    file = models.FileField(blank=False, null=False)
+    remark = models.CharField(max_length=20)
+    timestamp = models.DateTimeField(auto_now_add=True)

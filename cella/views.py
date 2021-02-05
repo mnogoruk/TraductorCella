@@ -1,14 +1,16 @@
 from django.http import Http404
 from rest_framework import filters, status
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView, UpdateAPIView
+from rest_framework.parsers import FileUploadParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import pandas as pd
 
 from .generic.views import ForRawQueryViewMixin
 from .service import Resources, Specifications
 from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer, \
-    SpecificationDetailSerializer, SpecificationListSerializer, ResourceShortListSerializer, ProviderSerializer, \
-    SpecificationCategorySerializer
+    SpecificationDetailSerializer, SpecificationListSerializer, ResourceShortSerializer, ProviderSerializer, \
+    SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer
 from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
 from .utils.exceptions import NoParameter
@@ -62,7 +64,7 @@ class ResourceWithUnverifiedCostsView(ListAPIView):
         return service.with_unverified_cost()
 
 
-class ResourceListView(ListAPIView, ForRawQueryViewMixin):
+class ResourceListView(ListAPIView):
     serializer_class = ResourceSerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -92,7 +94,7 @@ class ResourceActionsView(ListAPIView):
 
 
 class ResourceShortListView(ListAPIView):
-    serializer_class = ResourceShortListSerializer
+    serializer_class = ResourceShortSerializer
 
     def get_queryset(self):
         service = Resources(self.request)
@@ -127,7 +129,7 @@ class ResourceSetCost(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        r_id = kwargs.get('r_id')
+        r_id = data.get('id', None)
         value = data.get('cost', None)
         if value is not None:
             service = Resources(request)
@@ -137,15 +139,26 @@ class ResourceSetCost(APIView):
             raise NoParameter()
 
 
+class ResourceAddAmount(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        r_id = data.get('id')
+        delta_amount = data.get('amount')
+        service = Resources(request)
+        amount, _ = service.change_amount(r_id, delta_amount)
+        return Response(data={'amount': amount.value}, status=status.HTTP_202_ACCEPTED)
+
+
 class ResourceVerifyCost(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        r_id = kwargs.get('r_id')
+        r_id = data.get('id', None)
         value = data.get('verify', None)
         if value is not None:
             service = Resources(request)
-            print(service.verify_cost(r_id))
+            service.verify_cost(r_id)
             return Response(data={'verified': True}, status=status.HTTP_202_ACCEPTED)
         else:
             raise NoParameter()
@@ -173,3 +186,23 @@ class SpecificationCreateView(CreateAPIView):
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)
+
+
+class SpecificationEditView(RetrieveUpdateAPIView):
+    serializer_class = SpecificationEditSerializer
+
+    def perform_update(self, serializer):
+        return serializer.save(user=self.request.user)
+
+    def get_object(self):
+        return Specification.objects.get(id=self.kwargs['s_id'])
+
+
+class FileUploadView(CreateAPIView):
+    serializer_class = FileSerializer
+
+    def post(self, request, *args, **kwargs):
+        file = request.FILES['file']
+        excel = pd.read_excel(file)
+        print(excel)
+        return super().post(request, *args, **kwargs)
