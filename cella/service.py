@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper
 
@@ -33,13 +35,6 @@ class Operators(Service):
         else:
             operator = Operator.get_user_operator(user)
         return operator
-
-
-class Providers(Service):
-
-    @classmethod
-    def get_by_name(cls, name):
-        return ResourceProvider.objects.get(name=name)
 
 
 class Resources(Service):
@@ -268,9 +263,10 @@ class Specifications(Service):
     def detail(self, s_id):
         specification = Specification.objects.select_related('category').get(id=s_id)
 
-        service = Resources(self.request)
         query_res_spec = ResourceSpecification.objects.filter(specification=specification, resource=OuterRef('pk'))
-        resources = service.list().annotate(
+        cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
+        resources = Resource.objects.annotate(
+            cost=Subquery(cost_qr.values('value')),
             res_spec_ex=Exists(query_res_spec.values('id')),
             needed_amount=Subquery(query_res_spec.values('amount')[:1])).filter(res_spec_ex=True)
         try:
@@ -300,3 +296,162 @@ class Specifications(Service):
 
     def categories(self):
         return SpecificationCategory.objects.all()
+
+    @classmethod
+    def create(cls,
+               name: str,
+               product_id: str,
+               price: float = None,
+               resources: List[Dict[str, str]] = None,
+               category_name: str = None,
+               user=None):
+
+        operator = Operators.get_operator_by_user(user)
+
+        if price is None:
+            price = 0
+
+        if category_name is not None:
+            category = SpecificationCategory.objects.get_or_create(name=category_name)[0]
+
+        else:
+            category = None
+
+        if Specification.objects.filter(product_id=product_id, is_active=True).exists():
+            s = Specification.objects.filter(product_id=product_id).get(is_active=True)
+            s.is_active = False
+            s.save()
+
+            SpecificationAction.objects.create(
+                specification=s,
+                action_type=SpecificationAction.ActionType.DEACTIVATE,
+                operator=operator)
+
+        specification = Specification.objects.create(
+            name=name,
+            product_id=product_id,
+            category=category,
+            is_active=True)
+
+        res_specs = []
+        _resources = []
+        if resources is not None and len(resources) != 0:
+            for resource in resources:
+                # optimize it...
+                res = Resource.objects.get(id=resource['id'])
+                res.cost = ResourceCost.objects.filter(resource=res).latest('time_stamp').value
+                res_specs.append(
+                    ResourceSpecification(
+                        resource=res,
+                        amount=resource['amount'],
+                        specification=specification
+                    )
+                )
+                _resources.append({'resource': res, 'amount': resource['amount']})
+
+            ResourceSpecification.objects.bulk_create(res_specs)
+
+        specification.resources = _resources
+
+        SpecificationAction.objects.create(
+            specification=specification,
+            action_type=SpecificationAction.ActionType.CREATE,
+            operator=operator
+        )
+
+        if price is not None:
+            price = SpecificationPrice.objects.create(
+                specification=specification,
+                value=price,
+                verified=True
+            )
+            SpecificationAction.objects.create(
+                specification=specification,
+                action_type=SpecificationAction.ActionType.SET_PRICE,
+                operator=operator
+            )
+            specification.price = price.value
+            specification.price_time_stamp = price.time_stamp
+        else:
+            specification.price = None
+            specification.price_time_stamp = None
+
+        return specification
+
+    @classmethod
+    def edit(cls,
+             specification,
+             name: str = None,
+             product_id: str = None,
+             price: float = None,
+             resource_to_add: List[Dict[str, str]] = None,
+             resource_to_delete: List[str] = None,
+             category_name: str = None,
+             user=None):
+
+        if name is not None:
+            specification.name = name
+        if product_id is not None:
+            specification.product_id = product_id
+        if category_name is not None:
+            specification.category = SpecificationCategory.objects.get_or_create(name=category_name)[0]
+
+        specification.save()
+        operator = Operators.get_operator_by_user(user)
+
+        SpecificationAction.objects.create(specification=specification,
+                                           action_type=SpecificationAction.ActionType.UPDATE,
+                                           operator=operator)
+
+        if price is not None:
+            price = SpecificationPrice.objects.create(value=price, specification=specification)
+            SpecificationAction.objects.create(specification=specification,
+                                               action_type=SpecificationAction.ActionType.SET_PRICE,
+                                               operator=operator)
+
+            specification.price = price.value
+            specification.price_time_stamp = price.time_stamp
+
+        else:
+            try:
+                price = SpecificationPrice.objects.filter(specification=specification).latest('time_stamp')
+                specification.price = price.value
+                specification.price_time_stamp = price.time_stamp
+
+            except SpecificationPrice.DoesNotExist():
+                specification.price = None
+                specification.price_time_stamp = None
+
+        if resource_to_delete is not None and len(resource_to_delete) != 0:
+            ResourceSpecification.objects.filter(resource_id__in=resource_to_delete).delete()
+
+        if resource_to_add is not None and len(resource_to_add) != 0:
+            res_specs = []
+            _resources = []
+            for resource in resource_to_add:
+                res = Resource.objects.get(id=resource['id'])
+                res.cost = ResourceCost.objects.filter(resource=res).latest('time_stamp').value
+                res_specs.append(
+                    ResourceSpecification(
+                        resource_id=resource['id'],
+                        amount=resource['amount'],
+                        specification=specification
+                    )
+                )
+                _resources.append({'resource': res, 'amount': resource['amount']})
+
+            ResourceSpecification.objects.bulk_create(res_specs)
+
+        try:
+            res_specs = ResourceSpecification.objects.select_related('resource').filter(specification=specification)
+            for res_spec in res_specs:
+                res = res_spec.resource
+                res_cost = ResourceCost.objects.get(resource=res)
+                res.cost = res_cost.value
+
+        except ResourceSpecification.DoesNotExist():
+            res_specs = []
+
+        specification.resources = res_specs
+
+        return specification

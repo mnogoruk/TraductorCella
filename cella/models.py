@@ -98,7 +98,7 @@ class ResourceAction(models.Model):
 
 class SpecificationCategory(models.Model):
     name = models.CharField(max_length=100)
-    coefficient = models.DecimalField(max_digits=8, decimal_places=2)
+    coefficient = models.DecimalField(max_digits=8, decimal_places=2, null=True)
 
     def __str__(self):
         return self.name
@@ -113,6 +113,7 @@ class Specification(models.Model):
                                  null=True,
                                  blank=True)
     is_active = models.BooleanField(default=True)
+
     # resources = models.ManyToManyField(Resource, through='ResourceSpecification')
 
     def __str__(self):
@@ -135,7 +136,7 @@ class SpecificationAction(models.Model):
         DEACTIVATE = 'DCT', 'Deactivate'
         ACTIVATE = 'ACT', 'Activate'
         SET_PRICE = 'STP', 'Set price'
-        UPDATE_FIELDS = 'UPF', 'Update fields'
+        UPDATE = 'UPD', 'Update'
 
     specification = models.ForeignKey(Specification,
                                       on_delete=models.SET_NULL,
@@ -204,3 +205,9 @@ class OrderAction(models.Model):
 
     def __str__(self):
         return f"{self.action_type} for {self.order}"
+
+
+class File(models.Model):
+    file = models.FileField(blank=False, null=False)
+    remark = models.CharField(max_length=20)
+    timestamp = models.DateTimeField(auto_now_add=True)
