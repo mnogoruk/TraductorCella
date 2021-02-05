@@ -132,7 +132,7 @@ class SpecificationPrice(models.Model):
 
 class SpecificationCoefficient(models.Model):
     specification = models.ForeignKey(Specification, on_delete=models.CASCADE)
-    value = models.DecimalField(max_digits=8, decimal_places=2)
+    value = models.DecimalField(max_digits=8, decimal_places=2, null=False)
     time_stamp = models.DateTimeField(auto_now=True)
 
     def __str__(self):

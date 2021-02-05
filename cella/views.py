@@ -117,6 +117,7 @@ class SpecificationDetailView(RetrieveAPIView):
 
 class SpecificationListView(ListAPIView):
     serializer_class = SpecificationListSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         service = Specifications(self.request)
