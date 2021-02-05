@@ -15,7 +15,9 @@ from .models import (Operator,
                      ResourceSpecificationAssembled,
                      Order,
                      OrderSpecification,
-                     OrderAction)
+                     OrderAction,
+                     SpecificationCoefficient,
+                     File)
 
 admin.site.register(Operator)
 
@@ -28,6 +30,7 @@ admin.site.register(ResourceAction)
 admin.site.register(SpecificationCategory)
 admin.site.register(Specification)
 admin.site.register(SpecificationPrice)
+admin.site.register(SpecificationCoefficient)
 admin.site.register(SpecificationAction)
 
 admin.site.register(ResourceSpecification)
@@ -36,3 +39,5 @@ admin.site.register(ResourceSpecificationAssembled)
 admin.site.register(Order)
 admin.site.register(OrderSpecification)
 admin.site.register(OrderAction)
+
+admin.site.register(File)

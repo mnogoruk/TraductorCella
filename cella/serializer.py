@@ -136,7 +136,9 @@ class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
 class SpecificationDetailSerializer(serializers.ModelSerializer):
     resources = SpecificationResourceSerializer(many=True, read_only=True)
     price = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    coefficient = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     price_time_stamp = serializers.DateTimeField(read_only=True)
+    coefficient_time_stamp = serializers.DateTimeField(read_only=True)
     category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     category = SpecificationCategorySerializer(read_only=True, required=False)
     is_active = serializers.BooleanField(read_only=True)
@@ -151,6 +153,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             name=validated_data['name'],
             product_id=validated_data['product_id'],
             price=validated_data['price'],
+            coefficient=validated_data['coefficient'],
             resources=validated_data['resources_create'],
             category_name=validated_data['category_name'],
             user=validated_data['request'].user
@@ -162,7 +165,9 @@ class SpecificationListSerializer(serializers.ModelSerializer):
     category = SpecificationCategorySerializer()
     prime_cost = serializers.DecimalField(max_digits=8, decimal_places=2)
     price = serializers.DecimalField(max_digits=8, decimal_places=2)
+    coefficient = serializers.DecimalField(max_digits=8, decimal_places=2)
     price_time_stamp = serializers.DateTimeField()
+    coefficient_time_stamp = serializers.DateTimeField()
 
     class Meta:
         model = Specification
@@ -174,6 +179,7 @@ class SpecificationEditSerializer(serializers.ModelSerializer):
     product_id = serializers.CharField(required=False, allow_null=True)
     category_name = serializers.CharField(required=False, allow_null=True, write_only=True)
     price = serializers.DecimalField(required=False, allow_null=True, max_digits=8, decimal_places=2)
+    coefficient = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     resource_to_add = SpecificationResourceCreateUpdateSerializer(required=False, many=True, default=[],
                                                                   write_only=True)
     resource_to_delete = serializers.ListField(required=False, default=[], write_only=True)

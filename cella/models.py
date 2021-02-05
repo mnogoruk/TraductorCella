@@ -130,6 +130,15 @@ class SpecificationPrice(models.Model):
         return f'{self.specification.name} - {self.value}'
 
 
+class SpecificationCoefficient(models.Model):
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE)
+    value = models.DecimalField(max_digits=8, decimal_places=2)
+    time_stamp = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.specification.name} - {self.value}'
+
+
 class SpecificationAction(models.Model):
     class ActionType(models.TextChoices):
         CREATE = 'CRT', 'Create'
@@ -137,6 +146,7 @@ class SpecificationAction(models.Model):
         ACTIVATE = 'ACT', 'Activate'
         SET_PRICE = 'STP', 'Set price'
         UPDATE = 'UPD', 'Update'
+        SET_COEFFICIENT = 'SCT', 'Set coefficient'
 
     specification = models.ForeignKey(Specification,
                                       on_delete=models.SET_NULL,
@@ -208,6 +218,9 @@ class OrderAction(models.Model):
 
 
 class File(models.Model):
+    class Direction(models.TextChoices):
+        RESOURCE_ADD = 'RAD', 'Resource add'
+
     file = models.FileField(blank=False, null=False)
-    remark = models.CharField(max_length=20)
+    direction = models.CharField(choices=Direction.choices, max_length=3, default=Direction.RESOURCE_ADD)
     timestamp = models.DateTimeField(auto_now_add=True)

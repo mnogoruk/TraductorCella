@@ -14,6 +14,7 @@ from .models import (Operator,
                      SpecificationPrice,
                      SpecificationCategory,
                      ResourceSpecificationAssembled,
+                     SpecificationCoefficient,
                      ResourceSpecification)
 from django.db import IntegrityError, transaction
 
@@ -276,6 +277,13 @@ class Specifications(Service):
         except SpecificationPrice.DoesNotExist:
             specification.price = None
             specification.price_time_stamp = None
+        try:
+            coefficient = SpecificationCoefficient.objects.filter(specification=specification).latest('time_stamp')
+            specification.coefficient = coefficient.value
+            specification.coefficient_time_stamp = coefficient.time_stamp
+        except SpecificationCoefficient.DoesNotExist:
+            specification.coefficient = None
+            specification.coefficient_time_stamp = None
         resources = [{'resource': resource, 'amount': resource.needed_amount} for resource in resources]
         specification.resources = resources
 
@@ -287,10 +295,14 @@ class Specifications(Service):
             'specification_id').annotate(
             total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')))
         query_price = SpecificationPrice.objects.filter(specification=OuterRef('pk')).order_by('-time_stamp')
+        query_coefficient = SpecificationCoefficient.objects.filter(specification=OuterRef('pk')).order_by(
+            '-time_stamp')
         specifications = Specification.objects.select_related('category').annotate(
             prime_cost=Subquery(query_res_spec.values('total_cost')[:2]),
             price=Subquery(query_price.values('value')[:1]),
-            price_time_stamp=Subquery(query_price.values('time_stamp')[:1])
+            price_time_stamp=Subquery(query_price.values('time_stamp')[:1]),
+            coefficient=Subquery(query_coefficient.values('value')[:1]),
+            coefficient_time_stamp=Subquery(query_coefficient.values('time_stamp')[:1]),
         )
         return specifications
 
@@ -302,6 +314,7 @@ class Specifications(Service):
                name: str,
                product_id: str,
                price: float = None,
+               coefficient: float = None,
                resources: List[Dict[str, str]] = None,
                category_name: str = None,
                user=None):
@@ -376,6 +389,31 @@ class Specifications(Service):
             specification.price = None
             specification.price_time_stamp = None
 
+        if coefficient is not None:
+            coefficient = SpecificationCoefficient.objects.create(
+                specification=specification,
+                value=coefficient,
+            )
+            SpecificationAction.objects.create(
+                specification=specification,
+                action_type=SpecificationAction.ActionType.SET_COEFFICIENT,
+                operator=operator
+            )
+            specification.coefficient = coefficient.value
+            specification.coefficient_time_stamp = coefficient.time_stamp
+        elif category.coefficient is not None:
+            coefficient = SpecificationCoefficient.objects.create(
+                specification=specification,
+                value=category.coefficient
+            )
+            SpecificationAction.objects.create(
+                specification=specification,
+                action_type=SpecificationAction.ActionType.SET_COEFFICIENT,
+                operator=operator
+            )
+            specification.coefficient = coefficient.value
+            specification.coefficient_time_stamp = coefficient.time_stamp
+
         return specification
 
     @classmethod
@@ -384,6 +422,7 @@ class Specifications(Service):
              name: str = None,
              product_id: str = None,
              price: float = None,
+             coefficient: float = None,
              resource_to_add: List[Dict[str, str]] = None,
              resource_to_delete: List[str] = None,
              category_name: str = None,
@@ -422,6 +461,26 @@ class Specifications(Service):
                 specification.price = None
                 specification.price_time_stamp = None
 
+        if coefficient is not None:
+            coefficient = SpecificationCoefficient.objects.create(value=coefficient,
+                                                                  specification=specification)
+            SpecificationAction.objects.create(specification=specification,
+                                               action_type=SpecificationAction.ActionType.SET_COEFFICIENT,
+                                               operator=operator)
+
+            specification.coefficient = coefficient.value
+            specification.coefficient_time_stamp = coefficient.time_stamp
+
+        else:
+            try:
+                coefficient = SpecificationCoefficient.objects.filter(specification=specification).latest('time_stamp')
+                specification.coefficient = coefficient.value
+                specification.coefficient_time_stamp = coefficient.time_stamp
+
+            except SpecificationCoefficient.DoesNotExist():
+                specification.coefficient = None
+                specification.coefficient_time_stamp = None
+
         if resource_to_delete is not None and len(resource_to_delete) != 0:
             ResourceSpecification.objects.filter(resource_id__in=resource_to_delete).delete()
 
@@ -455,3 +514,28 @@ class Specifications(Service):
         specification.resources = res_specs
 
         return specification
+
+    @classmethod
+    def set_price(cls, s_id, price: float, user=None):
+        coefficient = SpecificationCoefficient.objects.create(specification_id=s_id, value=price)
+        SpecificationAction.objects.create(
+            specification_id=s_id,
+            action_type=SpecificationAction.ActionType.SET_COEFFICIENT,
+            operator=Operators.get_operator_by_user(user)
+        )
+        return coefficient
+
+    @classmethod
+    def set_category(cls, ids: List, category_id):
+        category = SpecificationCategory.objects.get(id=category_id)
+        if category.coefficient is not None:
+            for s_id in ids:
+                SpecificationCoefficient.objects.create(
+                    specification_id=s_id,
+                    value=category.coefficient
+                )
+        Specification.objects.filter(id__in=ids).update(category=category)
+
+class Order(Service):
+
+    pass
