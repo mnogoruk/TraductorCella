@@ -538,7 +538,7 @@ class Specifications(Service):
 
     @classmethod
     def set_price(cls, s_id, price: float, user=None):
-        price = SpecificationPrice.objects.create(specification_id=s_id, value=price, user=user)
+        price = SpecificationPrice.objects.create(specification_id=s_id, value=price)
         SpecificationAction.objects.create(
             specification_id=s_id,
             action_type=SpecificationAction.ActionType.SET_PRICE,
