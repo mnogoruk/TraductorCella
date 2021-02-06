@@ -536,6 +536,6 @@ class Specifications(Service):
                 )
         Specification.objects.filter(id__in=ids).update(category=category)
 
-class Order(Service):
 
+class Order(Service):
     pass
