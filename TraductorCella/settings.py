@@ -69,6 +69,9 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'TraductorCella.urls'
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
+SITE_ID = 1
 
 TEMPLATES = [
     {
