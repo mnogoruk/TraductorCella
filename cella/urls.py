@@ -25,7 +25,7 @@ urlpatterns = [
     path('specification/categories/', SpecificationCategoryListView.as_view()),
     path('specification/create/', SpecificationCreateView.as_view()),
     path('specification/edit/<int:s_id>/', SpecificationEditView.as_view()),
-    path('specifiaction/set-price/', SpecificationSetPriceView.as_view()),
-    path('specifiaction/set-coefficient/', SpecificationSetCoefficientView.as_view())
+    path('specification/set-price/', SpecificationSetPriceView.as_view()),
+    path('specification/set-coefficient/', SpecificationSetCoefficientView.as_view())
 
 ]
