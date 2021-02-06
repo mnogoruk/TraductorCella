@@ -5,7 +5,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 import pandas as pd
 
-
 from .service import Resources, Specifications
 from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer, \
     SpecificationDetailSerializer, SpecificationListSerializer, ResourceShortSerializer, ProviderSerializer, \
@@ -117,6 +116,7 @@ class SpecificationDetailView(RetrieveAPIView):
 
 class SpecificationListView(ListAPIView):
     serializer_class = SpecificationListSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         service = Specifications(self.request)
@@ -195,6 +195,32 @@ class SpecificationEditView(RetrieveUpdateAPIView):
 
     def get_object(self):
         return Specification.objects.get(id=self.kwargs['s_id'])
+
+
+class SpecificationSetPriceView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        s_id = data.get('id', None)
+        value = data.get('price', None)
+        if value is not None and s_id is not None:
+            Specifications.set_price(s_id=s_id, price=value)
+            return Response(data={'price': value}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()
+
+
+class SpecificationSetCoefficientView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        s_id = data.get('id', None)
+        value = data.get('coefficient', None)
+        if value is not None and s_id is not None:
+            Specifications.set_coefficient(s_id=s_id, coefficient=value)
+            return Response(data={'coefficient': value}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()
 
 
 class ResourceExelUpload(CreateAPIView):
