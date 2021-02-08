@@ -308,8 +308,8 @@ class Specifications(Service):
         query_res_spec = ResourceSpecification.objects.filter(specification=OuterRef('pk')).values(
             'specification_id').annotate(
             total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')),
-            verified=Cast(Min(Cast(query_cost.values('verified')[:1], output_field=IntegerField)),
-                          output_field=BooleanField))
+            verified=Cast(Min(Cast(query_cost.values('verified')[:1], output_field=IntegerField())),
+                          output_field=BooleanField()))
         query_price = SpecificationPrice.objects.filter(specification=OuterRef('pk')).order_by('-time_stamp')
         query_coefficient = SpecificationCoefficient.objects.filter(specification=OuterRef('pk')).order_by(
             '-time_stamp')
