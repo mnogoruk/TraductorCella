@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'silk',
     'django_filters',
+    'corsheaders'
 ]
 
 DEBUG_TOOLBAR_CONFIG = {
@@ -66,9 +67,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 ROOT_URLCONF = 'TraductorCella.urls'
 
-CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 SITE_ID = 1

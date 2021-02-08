@@ -2,7 +2,10 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from .service import Resources, Specifications
-from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory, File
+from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory, File, Order, \
+    OrderSpecification
+
+
 class ProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ResourceProvider
@@ -44,6 +47,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
     last_change_cost = serializers.DateTimeField(read_only=True)
     last_change_amount = serializers.DateTimeField(read_only=True)
+    verified = serializers.BooleanField(allow_null=True, read_only=True)
 
     def create(self, validated_data):
         service = Resources(request=validated_data.get('request'))
@@ -94,15 +98,14 @@ class ResourceSerializer(serializers.ModelSerializer):
             'cost',
             'amount',
             'last_change_amount',
-            'last_change_cost']
+            'last_change_cost',
+            'verified']
 
 
 class ResourceShortSerializer(serializers.ModelSerializer):
-    cost = serializers.DecimalField(max_digits=8, decimal_places=2)
-
     class Meta:
         model = Resource
-        fields = ['id', 'name', 'external_id', 'cost']
+        fields = ['id', 'name', 'external_id']
 
 
 class SpecificationCategorySerializer(serializers.ModelSerializer):
@@ -134,7 +137,7 @@ class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
 
 
 class SpecificationDetailSerializer(serializers.ModelSerializer):
-    resources = SpecificationResourceSerializer(many=True, read_only=True)
+    resources = SpecificationResourceSerializer(many=True, read_only=True, allow_null=True)
     price = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     coefficient = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     price_time_stamp = serializers.DateTimeField(read_only=True)
@@ -143,6 +146,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
     category = SpecificationCategorySerializer(read_only=True, required=False)
     is_active = serializers.BooleanField(read_only=True)
     resources_create = SpecificationResourceCreateUpdateSerializer(many=True, write_only=True)
+    verified = serializers.BooleanField(read_only=True, allow_null=True)
 
     class Meta:
         model = Specification
@@ -168,6 +172,7 @@ class SpecificationListSerializer(serializers.ModelSerializer):
     coefficient = serializers.DecimalField(max_digits=8, decimal_places=2)
     price_time_stamp = serializers.DateTimeField()
     coefficient_time_stamp = serializers.DateTimeField()
+    verified = serializers.BooleanField(allow_null=True, read_only=True)
 
     class Meta:
         model = Specification
@@ -194,8 +199,21 @@ class SpecificationEditSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FileSerializer(serializers.ModelSerializer):
+class OrderSpecificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderSpecification
+        fields = ['specification', 'amount', 'assembled']
 
+
+class OrderSerializer(serializers.ModelSerializer):
+    order_specification = OrderSpecificationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+
+class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = File
         fields = '__all__'

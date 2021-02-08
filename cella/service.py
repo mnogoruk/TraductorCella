@@ -1,7 +1,7 @@
 from typing import List, Dict
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper
+from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper, Min
 
 from .models import (Operator,
                      ResourceProvider,
@@ -15,7 +15,10 @@ from .models import (Operator,
                      SpecificationCategory,
                      ResourceSpecificationAssembled,
                      SpecificationCoefficient,
-                     ResourceSpecification)
+                     ResourceSpecification,
+                     Order,
+                     OrderSpecification,
+                     OrderAction)
 from django.db import IntegrityError, transaction
 
 
@@ -54,6 +57,7 @@ class Resources(Service):
         resource.amount = amount.value
         resource.cost_time_stamp = cost.time_stamp
         resource.amount_time_stamp = amount.time_stamp
+        resource.verified = cost.verified
         return resource
 
     def create(self,
@@ -223,13 +227,15 @@ class Resources(Service):
         query = Resource.objects.select_related('provider').annotate(
             cost=Subquery(cost_qr.values('value')[:1]),
             last_change_cost=Subquery(cost_qr.values('time_stamp')[:1]),
-            amount=Subquery(amount_qr.values_list('value')[:1]),
-            last_change_amount=Subquery(amount_qr.values_list('time_stamp')[:1])
+            amount=Subquery(amount_qr.values('value')[:1]),
+            last_change_amount=Subquery(amount_qr.values('time_stamp')[:1]),
+            verified=Subquery(cost_qr.values('verified')[:1]),
         )
 
-        return query
+        return query.order_by('verified')
 
     def shortlist(self):
+
         return Resource.objects.all()
 
     def providers(self):
@@ -261,15 +267,21 @@ class Resources(Service):
 
 class Specifications(Service):
 
-    def detail(self, s_id):
-        specification = Specification.objects.select_related('category').get(id=s_id)
+    @classmethod
+    def detail(cls, specification):
+        if not isinstance(specification, Specification):
+            specification = Specification.objects.select_related('category').get(id=specification)
 
         query_res_spec = ResourceSpecification.objects.filter(specification=specification, resource=OuterRef('pk'))
         cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
+        amount_qr = ResourceAmount.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
         resources = Resource.objects.annotate(
-            cost=Subquery(cost_qr.values('value')),
+            cost=Subquery(cost_qr.values('value')[:1]),
+            amount=Subquery(amount_qr.values('value')[:1]),
             res_spec_ex=Exists(query_res_spec.values('id')),
-            needed_amount=Subquery(query_res_spec.values('amount')[:1])).filter(res_spec_ex=True)
+            needed_amount=Subquery(query_res_spec.values('amount')[:1]),
+            verified=Subquery(cost_qr.values('verified')[:1])).filter(res_spec_ex=True)
+        specification.verified = not resources.filter(verified=False).exists()
         try:
             price = SpecificationPrice.objects.filter(specification=specification).latest('time_stamp')
             specification.price = price.value
@@ -293,16 +305,18 @@ class Specifications(Service):
         query_cost = ResourceCost.objects.filter(resource_id=OuterRef('resource_id')).order_by('-time_stamp')
         query_res_spec = ResourceSpecification.objects.filter(specification=OuterRef('pk')).values(
             'specification_id').annotate(
-            total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')))
+            total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')),
+            verified=Min(query_cost.values('verified')[:1]))
         query_price = SpecificationPrice.objects.filter(specification=OuterRef('pk')).order_by('-time_stamp')
         query_coefficient = SpecificationCoefficient.objects.filter(specification=OuterRef('pk')).order_by(
             '-time_stamp')
         specifications = Specification.objects.select_related('category').annotate(
-            prime_cost=Subquery(query_res_spec.values('total_cost')[:2]),
+            prime_cost=Subquery(query_res_spec.values('total_cost')),
             price=Subquery(query_price.values('value')[:1]),
             price_time_stamp=Subquery(query_price.values('time_stamp')[:1]),
             coefficient=Subquery(query_coefficient.values('value')[:1]),
             coefficient_time_stamp=Subquery(query_coefficient.values('time_stamp')[:1]),
+            verified=Subquery(query_res_spec.values('verified')[:1])
         )
         return specifications
 
@@ -317,6 +331,7 @@ class Specifications(Service):
                coefficient: float = None,
                resources: List[Dict[str, str]] = None,
                category_name: str = None,
+               storage_amount: int = None,
                user=None):
 
         operator = Operators.get_operator_by_user(user)
@@ -344,6 +359,7 @@ class Specifications(Service):
             name=name,
             product_id=product_id,
             category=category,
+            storage_amount=storage_amount,
             is_active=True)
 
         res_specs = []
@@ -426,6 +442,7 @@ class Specifications(Service):
              resource_to_add: List[Dict[str, str]] = None,
              resource_to_delete: List[str] = None,
              category_name: str = None,
+             storage_amount: int = None,
              user=None):
 
         if name is not None:
@@ -434,6 +451,8 @@ class Specifications(Service):
             specification.product_id = product_id
         if category_name is not None:
             specification.category = SpecificationCategory.objects.get_or_create(name=category_name)[0]
+        if storage_amount is not None:
+            specification.storage_amount = storage_amount
 
         specification.save()
         operator = Operators.get_operator_by_user(user)
@@ -547,5 +566,168 @@ class Specifications(Service):
         return price
 
 
-class Order(Service):
-    pass
+class Orders(Service):
+    class CanNotAssembleOrder(Exception):
+        pass
+
+    class CanNotManageAction(Exception):
+        pass
+
+    @classmethod
+    def list(cls):
+        return Order.objects.prefetch_related(
+            'order_specification',
+            'order_specification__specification'
+        ).exclude(
+            status__in=[
+                Order.OrderStatus.ARCHIVED
+            ]
+        ).order_by('status')
+
+    @classmethod
+    def detail(cls, o_id):
+        order = Order.objects.prefetch_related(
+            'order_specification',
+            'order_specification__specification',
+        ).get(id=o_id)
+        return order
+
+    @classmethod
+    def _activate(cls, order, operator):
+        order.status = Order.OrderStatus.ACTIVE
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.ACTIVATE,
+            operator=operator
+        )
+
+    @classmethod
+    def _deactivate(cls, order, operator):
+        order.status = Order.OrderStatus.INACTIVE
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.DEACTIVATE,
+            operator=operator
+        )
+
+    @classmethod
+    def _assembling(cls, order, operator):
+        order.status = Order.OrderStatus.ASSEMBLING
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.ASSEMBLING,
+            operator=operator
+        )
+
+    @classmethod
+    def _ready(cls, order, operator):
+        order.status = Order.OrderStatus.READY
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.PREPARING,
+            operator=operator
+        )
+
+    @classmethod
+    def _confirm(cls, order, operator):
+        order.status = Order.OrderStatus.CONFIRMED
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.CONFIRM,
+            operator=operator
+        )
+
+    @classmethod
+    def _archive(cls, order, operator):
+        order.status = Order.OrderStatus.ARCHIVED
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.ARCHIVATION,
+            operator=operator
+        )
+
+    @classmethod
+    def _cancel(cls, order, operator):
+        order.status = Order.OrderStatus.CANCELED
+        OrderAction.objects.create(
+            oreder=order,
+            action_type=OrderAction.ActionType.CANCEL,
+            operator=operator
+        )
+
+    @classmethod
+    def assemble_specification(cls, order_id, specification_id, user=None):
+        order = Order.objects.get(id=order_id)
+
+        if not (order.status == Order.OrderStatus.ACTIVE or order.status == Order.OrderStatus.ASSEMBLING):
+            raise cls.CanNotAssembleOrder()
+
+        operator = Operators.get_operator_by_user(user)
+
+        order_spec = OrderSpecification.objects.select_related('specification').filter(
+            specification_id=specification_id, order=order)
+
+        specification = order_spec.specification
+        if order_spec.amount >= specification.storage_amount:
+            specification -= order_spec.amount
+        else:
+            pass
+        specification.save()
+
+        order_spec.assembled = True
+        order_spec.save()
+
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.ASSEMBLING_SPECIFICATION,
+            operator=operator
+        )
+
+        if order.status == Order.OrderStatus.ACTIVE:
+            cls._assembling(order, operator)
+
+        if not OrderSpecification.objects.filter(order=order, assembled=False).exist():
+            cls._ready(order, operator)
+
+        order.save()
+
+    @classmethod
+    def disassemble_specification(cls, order_id, specification_id, user=None):
+        order = Order.objects.get(id=order_id)
+        if not (order.status == Order.OrderStatus.ACTIVE or order.status == Order.OrderStatus.ASSEMBLING):
+            raise cls.CanNotAssembleOrder()
+
+        operator = Operators.get_operator_by_user(user)
+        if not (order.status == Order.OrderStatus.ACTIVE or order.status == Order.OrderStatus.ASSEMBLING):
+            raise cls.CanNotAssembleOrder()
+
+        OrderSpecification.objects.filter(specification_id=specification_id, order=order).update(assembled=False)
+        OrderAction.objects.create(
+            order=order,
+            action_type=OrderAction.ActionType.DISASSEMBLING_SPECIFICATION,
+            operator=operator
+        )
+
+    @classmethod
+    def confirm(cls, order_id, user):
+        order = Order.objects.get(id=order_id)
+        if not order.status == Order.OrderStatus.READY:
+            raise cls.CanNotManageAction()
+        cls._confirm(order, Operators.get_operator_by_user(user))
+        order.save()
+
+    @classmethod
+    def activate(cls, order_id, user):
+        order = Order.objects.get(id=order_id)
+        if not order.status == Order.OrderStatus.INACTIVE:
+            raise cls.CanNotManageAction()
+        cls._confirm(order, Operators.get_operator_by_user(user))
+        order.save()
+
+    @classmethod
+    def deactivate(cls, order_id, user):
+        order = Order.objects.get(id=order_id)
+        if order.status not in [Order.OrderStatus.ACTIVE, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.READY]:
+            raise cls.CanNotManageAction()
+        cls._deactivate(order, Operators.get_operator_by_user(user))
+        order.save()
