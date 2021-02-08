@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     'whitenoise',
     'django.contrib.staticfiles',
     'rest_framework',
-    'corsheaders',
     'cella',
     'debug_toolbar',
     'silk',
