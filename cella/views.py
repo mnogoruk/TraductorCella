@@ -5,10 +5,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 import pandas as pd
 
-from .service import Resources, Specifications
+from .service import Resources, Specifications, Orders
 from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer, \
     SpecificationDetailSerializer, SpecificationListSerializer, ResourceShortSerializer, ProviderSerializer, \
-    SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer
+    SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer, OrderSerializer
 from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
 from .utils.exceptions import NoParameter
@@ -186,6 +186,10 @@ class SpecificationCreateView(CreateAPIView):
     def perform_create(self, serializer):
         return serializer.save(request=self.request)
 
+    def post(self, request, *args, **kwargs):
+        print(request.data)
+        return super().post(request, *args, **kwargs)
+
 
 class SpecificationEditView(RetrieveUpdateAPIView):
     serializer_class = SpecificationEditSerializer
@@ -223,12 +227,20 @@ class SpecificationSetCoefficientView(APIView):
             raise NoParameter()
 
 
+class OrderDetailView(RetrieveAPIView):
+    serializer_class = OrderSerializer
+
+    def get_object(self):
+        return Orders.detail(self.kwargs.get('o_id'))
+
+
 class ResourceExelUpload(CreateAPIView):
     serializer_class = FileSerializer
 
     def post(self, request, *args, **kwargs):
         file = request.FILES['file']
         excel = pd.read_excel(file)
+        print(excel)
         try:
             data = []
             for row in range(excel.shape[0]):
@@ -246,3 +258,57 @@ class ResourceExelUpload(CreateAPIView):
             return Response(data={'detail': 'Ошибка обработки файла'},
                             status=status.HTTP_400_BAD_REQUEST)
         return super().post(request, *args, **kwargs)
+
+
+class OrderListView(ListAPIView):
+    serializer_class = OrderSerializer
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        return Orders.list()
+
+
+class OrderAssembleSpecificationView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        order_id = data.get('order_id', None)
+        specification_id = data.get('specification_id', None)
+        if order_id is not None and specification_id is not None:
+            Orders.assemble_specification(order_id, specification_id)
+            return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()
+
+
+class OrderDisAssembleSpecificationView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        order_id = data.get('order_id', None)
+        specification_id = data.get('specification_id', None)
+        if order_id is not None and specification_id is not None:
+            Orders.disassemble_specification(order_id, specification_id)
+            return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()
+
+
+class OrderManageAction(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        order_id = data.get('order_id', None)
+        action = data.get('action', None)
+        if order_id is not None and action is not None:
+            if action == 'activate':
+                Orders.activate(order_id, request.user)
+            elif action == 'deactivate':
+                Orders.deactivate(order_id, request.user)
+            elif action == 'confirm':
+                Orders.confirm(order_id, request.user)
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()

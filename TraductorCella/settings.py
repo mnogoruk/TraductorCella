@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'silk',
     'django_filters',
+    'corsheaders'
 ]
 
 DEBUG_TOOLBAR_CONFIG = {
@@ -48,6 +49,7 @@ DEBUG_TOOLBAR_CONFIG = {
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
@@ -58,7 +60,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True
+
 ROOT_URLCONF = 'TraductorCella.urls'
+
 
 TEMPLATES = [
     {

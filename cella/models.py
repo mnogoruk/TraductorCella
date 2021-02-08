@@ -115,6 +115,8 @@ class Specification(models.Model):
     is_active = models.BooleanField(default=True)
 
     # resources = models.ManyToManyField(Resource, through='ResourceSpecification')
+    # time resolution:
+    storage_amount = models.IntegerField(default=0)
 
     def __str__(self):
         return f"{self.name}"
@@ -181,18 +183,29 @@ class ResourceSpecificationAssembled(models.Model):
 
 
 class Order(models.Model):
+    class OrderStatus(models.TextChoices):
+        INACTIVE = 'INC', 'Inactive'
+        ACTIVE = 'ACT', 'Active'
+        ASSEMBLING = 'ASS', 'Assembling'
+        READY = 'RDY', 'Ready'
+        ARCHIVED = 'ARC', 'Archived'
+        CONFIRMED = 'CNF', 'Confirmed'
+        CANCELED = 'CND', 'Canceled'
+
     external_id = models.CharField(max_length=100)
-    active = models.BooleanField(default=False)
-    archived = models.BooleanField(default=True)
+    status = models.CharField(max_length=3, choices=OrderStatus.choices, default=OrderStatus.INACTIVE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    source = models.CharField(max_length=100, default='Amazon')
 
     def __str__(self):
         return f"{self.external_id}"
 
 
 class OrderSpecification(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    specification = models.ForeignKey(Specification, on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_specification')
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='order_specification')
     amount = models.IntegerField()
+    assembled = models.BooleanField(default=False)
 
 
 class OrderAction(models.Model):
@@ -200,7 +213,13 @@ class OrderAction(models.Model):
         CREATE = 'CRT', 'Create'
         CONFIRM = 'CFM', 'Confirm'
         CANCEL = 'CNL', 'Cancel'
-        CONFIRM_SPECIFICATION = 'CSN', 'Confirm specification'
+        ACTIVATE = 'ACT', 'Activate'
+        DEACTIVATE = 'DCT', 'Deactivate'
+        ASSEMBLING = 'ASS', 'Assembling'
+        PREPARING = 'PRP', 'Preparing'
+        ARCHIVATION = 'ARC', 'Archivation'
+        ASSEMBLING_SPECIFICATION = 'ASP', 'Assembling specification'
+        DISASSEMBLING_SPECIFICATION = 'DSS', 'Disassembling specification'
 
     order = models.ForeignKey(Specification,
                               on_delete=models.CASCADE,

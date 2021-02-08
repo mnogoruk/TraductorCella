@@ -3,7 +3,8 @@ from .views import ResourceDetailView, ResourceCreateView, ResourceUpdateView, R
     ResourceWithUnverifiedCostsView, SpecificationDetailView, SpecificationListView, ResourceSetCost, \
     ResourceVerifyCost, ResourceShortListView, ProviderListView, SpecificationCategoryListView, SpecificationCreateView, \
     SpecificationEditView, ResourceAddAmount, ResourceExelUpload, SpecificationSetPriceView, \
-    SpecificationSetCoefficientView
+    SpecificationSetCoefficientView, OrderDetailView, OrderListView, OrderDisAssembleSpecificationView, \
+    OrderAssembleSpecificationView, OrderManageAction
 
 urlpatterns = [
 
@@ -26,6 +27,11 @@ urlpatterns = [
     path('specification/create/', SpecificationCreateView.as_view()),
     path('specification/edit/<int:s_id>/', SpecificationEditView.as_view()),
     path('specification/set-price/', SpecificationSetPriceView.as_view()),
-    path('specification/set-coefficient/', SpecificationSetCoefficientView.as_view())
+    path('specification/set-coefficient/', SpecificationSetCoefficientView.as_view()),
 
+    path('order/<int:o_id>/', OrderDetailView.as_view()),
+    path('order/list/', OrderListView.as_view()),
+    path('order/assemble-specification/', OrderAssembleSpecificationView.as_view()),
+    path('order/disassemble-specification/', OrderDisAssembleSpecificationView.as_view()),
+    path('order/action/', OrderManageAction.as_view())
 ]
