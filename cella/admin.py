@@ -12,7 +12,6 @@ from .models import (Operator,
                      SpecificationPrice,
                      SpecificationAction,
                      ResourceSpecification,
-                     ResourceSpecificationAssembled,
                      Order,
                      OrderSpecification,
                      OrderAction,
@@ -34,7 +33,6 @@ admin.site.register(SpecificationCoefficient)
 admin.site.register(SpecificationAction)
 
 admin.site.register(ResourceSpecification)
-admin.site.register(ResourceSpecificationAssembled)
 
 admin.site.register(Order)
 admin.site.register(OrderSpecification)

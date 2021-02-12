@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import Http404
 from rest_framework import filters, status
 from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView
@@ -14,14 +15,14 @@ from .utils.pagination import StandardResultsSetPagination
 from .utils.exceptions import NoParameter
 
 
+# Resources
 class ResourceDetailView(RetrieveAPIView):
     serializer_class = ResourceSerializer
 
     def get_object(self):
         r_id = self.kwargs['r_id']
-        service = Resources(self.request)
         try:
-            resource = service.detail(r_id)
+            resource = Resources.detail(r_id)
         except Resource.DoesNotExist:
             raise Http404()
         self.check_object_permissions(request=self.request, obj=resource)
@@ -44,9 +45,8 @@ class ResourceUpdateView(RetrieveUpdateAPIView):
 
     def get_object(self):
         r_id = self.kwargs['r_id']
-        service = Resources(self.request)
         try:
-            resource = service.detail(r_id)
+            resource = Resources.detail(r_id)
         except Resource.DoesNotExist:
             raise Http404()
         self.check_object_permissions(request=self.request, obj=resource)
@@ -58,8 +58,7 @@ class ResourceWithUnverifiedCostsView(ListAPIView):
     serializer_class = ResourceWithUnverifiedCostSerializer
 
     def get_queryset(self):
-        service = Resources(self.request)
-        return service.with_unverified_cost()
+        return Resources.with_unverified_cost()
 
 
 class ResourceListView(ListAPIView):
@@ -78,25 +77,109 @@ class ResourceListView(ListAPIView):
     ]
 
     def get_queryset(self):
-        service = Resources(self.request)
-        return service.list()
+        return Resources.list()
 
 
 class ResourceActionsView(ListAPIView):
     serializer_class = ResourceActionSerializer
 
     def get_queryset(self):
-        service = Resources(self.request)
-
-        return service.actions(self.kwargs['r_id'])
+        return Resources.actions(self.kwargs['r_id'])
 
 
 class ResourceShortListView(ListAPIView):
     serializer_class = ResourceShortSerializer
 
     def get_queryset(self):
-        service = Resources(self.request)
-        return service.shortlist()
+        return Resources.shortlist()
+
+
+class ResourceSetCostView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        r_id = data.get('id', None)
+        value = data.get('cost', None)
+        if value is not None:
+
+            cost = Resources.set_cost(r_id, value, request.user)
+            return Response(data={'id': r_id, 'cost': cost.value}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()
+
+
+class ResourceAddAmountView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        r_id = data.get('id')
+        delta_amount = data.get('amount')
+        amount = Resources.change_amount(r_id, delta_amount, user=request.user)
+        return Response(data={'id': r_id, 'amount': amount.value}, status=status.HTTP_202_ACCEPTED)
+
+
+class ResourceVerifyCostView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        r_id = data.get('id', None)
+        value = data.get('verify', None)
+        if value is not None:
+
+            Resources.verify_cost(r_id, request.user)
+            return Response(data={'id': r_id, 'verified': True}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameter()
+
+
+class ProviderListView(ListAPIView):
+    serializer_class = ProviderSerializer
+
+    def get_queryset(self):
+        return Resources.providers()
+
+
+class ResourceExelUploadView(CreateAPIView):
+    serializer_class = FileSerializer
+
+    def post(self, request, *args, **kwargs):
+        file = request.FILES['file']
+        excel = pd.read_excel(file)
+        print(excel)
+        try:
+            data = []
+            for row in range(excel.shape[0]):
+                r = excel.iloc[row]
+                data.append({
+                    'resource_name': r['Название'].strip(),
+                    'external_id': r['ID'].strip(),
+                    'cost_value': float(r['Цена']),
+                    'amount_value': float(r['Количество']),
+                    'provider_name': r['Поставщик'].strip()
+                })
+            Resources.bulk_create(data=data, user=request.user)
+        except Exception as ex:
+            return Response(data={'detail': 'Ошибка обработки файла'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return super().post(request, *args, **kwargs)
+
+
+class ResourceBulkDeleteView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        ids = data['ids']
+        Resources.bulk_delete(ids, request.user)
+        return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+
+
+# Specifications
+class SpecificationCategoryListView(ListAPIView):
+    serializer_class = SpecificationCategorySerializer
+
+    def get_queryset(self):
+        return Specifications.categories()
 
 
 class SpecificationDetailView(RetrieveAPIView):
@@ -104,9 +187,8 @@ class SpecificationDetailView(RetrieveAPIView):
 
     def get_object(self):
         s_id = self.kwargs['s_id']
-        service = Specifications(self.request)
         try:
-            specification = service.detail(s_id)
+            specification = Specifications.detail(s_id)
         except Specification.DoesNotExist:
             raise Http404()
         self.check_object_permissions(request=self.request, obj=specification)
@@ -119,65 +201,7 @@ class SpecificationListView(ListAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        service = Specifications(self.request)
-
-        return service.list()
-
-
-class ResourceSetCost(APIView):
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        r_id = data.get('id', None)
-        value = data.get('cost', None)
-        if value is not None:
-            service = Resources(request)
-            cost, _ = service.set_cost(r_id, value)
-            return Response(data={'cost': cost.value}, status=status.HTTP_202_ACCEPTED)
-        else:
-            raise NoParameter()
-
-
-class ResourceAddAmount(APIView):
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        r_id = data.get('id')
-        delta_amount = data.get('amount')
-        service = Resources(request)
-        amount, _ = service.change_amount(r_id, delta_amount)
-        return Response(data={'amount': amount.value}, status=status.HTTP_202_ACCEPTED)
-
-
-class ResourceVerifyCost(APIView):
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        r_id = data.get('id', None)
-        value = data.get('verify', None)
-        if value is not None:
-            service = Resources(request)
-            service.verify_cost(r_id)
-            return Response(data={'verified': True}, status=status.HTTP_202_ACCEPTED)
-        else:
-            raise NoParameter()
-
-
-class ProviderListView(ListAPIView):
-    serializer_class = ProviderSerializer
-
-    def get_queryset(self):
-        service = Resources(self.request)
-
-        return service.providers()
-
-
-class SpecificationCategoryListView(ListAPIView):
-    serializer_class = SpecificationCategorySerializer
-
-    def get_queryset(self):
-        service = Specifications(self.request)
-        return service.categories()
+        return Specifications.list()
 
 
 class SpecificationCreateView(CreateAPIView):
@@ -187,7 +211,6 @@ class SpecificationCreateView(CreateAPIView):
         return serializer.save(request=self.request)
 
     def post(self, request, *args, **kwargs):
-        print(request.data)
         return super().post(request, *args, **kwargs)
 
 
@@ -208,8 +231,8 @@ class SpecificationSetPriceView(APIView):
         s_id = data.get('id', None)
         value = data.get('price', None)
         if value is not None and s_id is not None:
-            Specifications.set_price(s_id=s_id, price=value)
-            return Response(data={'price': value}, status=status.HTTP_202_ACCEPTED)
+            Specifications.set_price(specification=s_id, price=value, user=request.user)
+            return Response(data={'id': s_id, 'price': value}, status=status.HTTP_202_ACCEPTED)
         else:
             raise NoParameter()
 
@@ -221,43 +244,63 @@ class SpecificationSetCoefficientView(APIView):
         s_id = data.get('id', None)
         value = data.get('coefficient', None)
         if value is not None and s_id is not None:
-            Specifications.set_coefficient(s_id=s_id, coefficient=value)
-            return Response(data={'coefficient': value}, status=status.HTTP_202_ACCEPTED)
+            Specifications.set_coefficient(specification=s_id, coefficient=value, user=request.user)
+            return Response(data={'id': s_id, 'coefficient': value}, status=status.HTTP_202_ACCEPTED)
         else:
             raise NoParameter()
 
 
+class SpecificationSetCategoryView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        s_ids = data['ids']
+        category = data['category']
+        Specifications.set_category(s_ids, category)
+        return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+
+
+class SpecificationAssembleInfoView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        s_id = self.kwargs['s_id']
+        assembling_amount = Specifications.assemble_info(s_id)
+
+        return Response(data={'assembling_amount': assembling_amount}, status=status.HTTP_200_OK)
+
+
+class SpecificationBuildSetView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+
+        s_id = data.get('id')
+        amount = data.get('amount')
+        from_resources = data.get('from_resources', False)
+
+        Specifications.build_set(s_id, amount, from_resources, user=request.user)
+        return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+
+
+class SpecificationBulkDeleteView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        ids = data['ids']
+        Specifications.bulk_delete(ids, request.user)
+        return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+
+
+class SpecificationCreateCategoryView(CreateAPIView):
+    serializer_class = SpecificationCategorySerializer
+
+
+# Orders
 class OrderDetailView(RetrieveAPIView):
     serializer_class = OrderSerializer
 
     def get_object(self):
         return Orders.detail(self.kwargs.get('o_id'))
-
-
-class ResourceExelUpload(CreateAPIView):
-    serializer_class = FileSerializer
-
-    def post(self, request, *args, **kwargs):
-        file = request.FILES['file']
-        excel = pd.read_excel(file)
-        print(excel)
-        try:
-            data = []
-            for row in range(excel.shape[0]):
-                r = excel.iloc[row]
-                data.append({
-                    'resource_name': r['Наименование'].strip(),
-                    'external_id': r['ID'].strip(),
-                    'cost_value': float(r['Цена']),
-                    'amount_value': float(r['Количество']),
-                    'provider_name': r['Поставщик'].strip()
-                })
-            service = Resources(request)
-            service.bulk_create(data=data)
-        except Exception as ex:
-            return Response(data={'detail': 'Ошибка обработки файла'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        return super().post(request, *args, **kwargs)
 
 
 class OrderListView(ListAPIView):
@@ -294,11 +337,11 @@ class OrderDisAssembleSpecificationView(APIView):
             raise NoParameter()
 
 
-class OrderManageAction(APIView):
+class OrderManageActionView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        order_id = data.get('order_id', None)
+        order_id = data.get('id', None)
         action = data.get('action', None)
         if order_id is not None and action is not None:
             if action == 'activate':
@@ -312,3 +355,29 @@ class OrderManageAction(APIView):
             return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
         else:
             raise NoParameter()
+
+
+class OrderAssemblingInfoView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        o_id = self.kwargs.get('o_id')
+        miss_specification, miss_resources = Orders.assembling_info(o_id)
+        return Response(data={'missing_specification': miss_specification,
+                              'missing_resources': miss_resources},
+                        status=status.HTTP_200_OK)
+
+
+class OrderBulkDeleteView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        ids = data['ids']
+        Orders.bulk_delete(ids, request.user)
+        return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+
+
+class OrderCreateView(CreateAPIView):
+    serializer_class = OrderSerializer
+
+    def perform_create(self, serializer):
+        return serializer.save(request=self.request)

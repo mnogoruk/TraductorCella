@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from .service import Resources, Specifications
+from .service import Resources, Specifications, Orders
 from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory, File, Order, \
     OrderSpecification
 
@@ -42,34 +42,33 @@ class ResourceSerializer(serializers.ModelSerializer):
                                         ]
                                         )
     provider = ProviderSerializer(read_only=True, allow_null=True)
-    provider_name = serializers.CharField(write_only=True, required=False, allow_null=True)
-    cost = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
-    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False)
+    provider_name = serializers.CharField(write_only=True, required=False, allow_null=True, default=None)
+    cost = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, min_value=0)
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, min_value=0)
     last_change_cost = serializers.DateTimeField(read_only=True)
     last_change_amount = serializers.DateTimeField(read_only=True)
     verified = serializers.BooleanField(allow_null=True, read_only=True)
 
     def create(self, validated_data):
-        service = Resources(request=validated_data.get('request'))
-        resource, _ = service.create(
+        resource = Resources.create(
             resource_name=validated_data.get('name'),
             external_id=validated_data.get('external_id'),
             cost_value=validated_data.get('cost'),
             amount_value=validated_data.get('amount'),
-            provider_name=validated_data.get('provider_name')
+            provider_name=validated_data.get('provider_name'),
+            user=validated_data.get('request').user
         )
         return resource
 
     def update(self, instance, validated_data):
-        service = Resources(request=validated_data.get('request'))
 
         cost = validated_data.get('cost')
         amount = validated_data.get('amount')
         resource_name = validated_data.get('name')
         external_id = validated_data.get('external_id')
         provider_name = validated_data.get('provider_name')
-
-        update_data = {}
+        user = validated_data.get('request').user
+        update_data = {'user': user}
 
         if resource_name is not None:
             update_data['resource_name'] = resource_name
@@ -78,12 +77,12 @@ class ResourceSerializer(serializers.ModelSerializer):
         if provider_name is not None:
             update_data['provider_name'] = provider_name
 
-        resource, _ = service.update_fields(r_id=instance.id, **update_data)
+        resource = Resources.update_fields(r_id=instance.id, **update_data)
 
         if cost is not None:
-            service.set_cost(r_id=instance.id, cost_value=cost)
+            Resources.set_cost(r_id=instance.id, cost_value=cost, user=user)
         if amount is not None:
-            service.set_amount(r_id=instance.id, amount_value=amount)
+            Resources.set_amount(r_id=instance.id, amount_value=amount, user=user)
 
         return resource
 
@@ -103,9 +102,12 @@ class ResourceSerializer(serializers.ModelSerializer):
 
 
 class ResourceShortSerializer(serializers.ModelSerializer):
+    cost = serializers.DecimalField(max_digits=8, decimal_places=2)
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2)
+
     class Meta:
         model = Resource
-        fields = ['id', 'name', 'external_id']
+        fields = ['id', 'name', 'external_id', 'cost', 'amount']
 
 
 class SpecificationCategorySerializer(serializers.ModelSerializer):
@@ -147,6 +149,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
     resources_create = SpecificationResourceCreateUpdateSerializer(many=True, write_only=True)
     verified = serializers.BooleanField(read_only=True, allow_null=True)
+    storage_amount = serializers.IntegerField(allow_null=True)
 
     class Meta:
         model = Specification
@@ -160,6 +163,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             coefficient=validated_data['coefficient'],
             resources=validated_data['resources_create'],
             category_name=validated_data['category_name'],
+            storage_amount=validated_data['storage_amount'],
             user=validated_data['request'].user
         )
         return spec
@@ -173,6 +177,7 @@ class SpecificationListSerializer(serializers.ModelSerializer):
     price_time_stamp = serializers.DateTimeField()
     coefficient_time_stamp = serializers.DateTimeField()
     verified = serializers.BooleanField(allow_null=True, read_only=True)
+    storage_amount = serializers.IntegerField(allow_null=True)
 
     class Meta:
         model = Specification
@@ -205,8 +210,28 @@ class OrderSpecificationSerializer(serializers.ModelSerializer):
         fields = ['specification', 'amount', 'assembled']
 
 
+class OrderSpecificationCreateUpdateSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2)
+    product_id = serializers.CharField()
+
+    def update(self, instance, validated_data):
+        pass
+
+    def create(self, validated_data):
+        pass
+
+
 class OrderSerializer(serializers.ModelSerializer):
     order_specification = OrderSpecificationSerializer(many=True, read_only=True)
+    specifications_create = OrderSpecificationCreateUpdateSerializer(write_only=True, many=True)
+
+    def create(self, validated_data):
+        order = Orders.create(
+            external_id=validated_data['external_id'],
+            source=validated_data['source'],
+            products=validated_data['specifications_create']
+        )
+        return order
 
     class Meta:
         model = Order

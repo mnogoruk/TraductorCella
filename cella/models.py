@@ -73,13 +73,15 @@ class ResourceAction(models.Model):
         SET_AMOUNT = 'STA', 'Set amount'
         RISE_AMOUNT = 'RSA', 'Rise amount'
         DROP_AMOUNT = 'DRA', 'Drop amount'
+        VERIFY_COST = 'VYC', 'Verify cost'
 
     class ActionMessage:
-        CREATE = "Ресурс создан"
-        SET_COST = "Установлена новая цена: {cost_value}"
-        SET_AMOUNT = "Установлена новое количество: {amount_value}"
-        RISE_AMOUNT = "Добавлено {delta_amount} ресуров"
-        DROP_AMOUNT = "Ушло {delta_amount} ресурсов"
+        CREATE = "Ресурс создан."
+        SET_COST = "Установлена новая цена: {cost_value}."
+        SET_AMOUNT = "Установлена новое количество: {amount_value}."
+        RISE_AMOUNT = "Добавлено {delta_amount} ресуров."
+        DROP_AMOUNT = "Ушло {delta_amount} ресурсов."
+        VERIFY_COST = "Утверждение цены."
 
     resource = models.ForeignKey(Resource,
                                  on_delete=models.CASCADE,
@@ -114,27 +116,31 @@ class Specification(models.Model):
                                  blank=True)
     is_active = models.BooleanField(default=True)
 
-    # resources = models.ManyToManyField(Resource, through='ResourceSpecification')
-    # time resolution:
-    storage_amount = models.IntegerField(default=0)
-
     def __str__(self):
         return f"{self.name}"
 
 
 class SpecificationPrice(models.Model):
-    specification = models.ForeignKey(Specification, on_delete=models.CASCADE)
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='prices')
     value = models.DecimalField(max_digits=8, decimal_places=2)
     time_stamp = models.DateTimeField(auto_now=True)
-    verified = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.specification.name} - {self.value}'
 
 
 class SpecificationCoefficient(models.Model):
-    specification = models.ForeignKey(Specification, on_delete=models.CASCADE)
-    value = models.DecimalField(max_digits=8, decimal_places=2, null=True)
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='coefficients')
+    value = models.DecimalField(max_digits=8, decimal_places=2)
+    time_stamp = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.specification.name} - {self.value}'
+
+
+class SpecificationAmount(models.Model):
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='amounts')
+    value = models.DecimalField(max_digits=8, decimal_places=2)
     time_stamp = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -147,6 +153,7 @@ class SpecificationAction(models.Model):
         DEACTIVATE = 'DCT', 'Deactivate'
         ACTIVATE = 'ACT', 'Activate'
         SET_PRICE = 'STP', 'Set price'
+        SET_AMOUNT = 'STA', 'Set amount'
         UPDATE = 'UPD', 'Update'
         SET_COEFFICIENT = 'SCT', 'Set coefficient'
 
@@ -166,20 +173,12 @@ class SpecificationAction(models.Model):
 
 
 class ResourceSpecification(models.Model):
-    resource = models.ForeignKey(Resource, on_delete=models.SET_NULL, null=True, related_name='res_spec')
-    specification = models.ForeignKey(Specification, on_delete=models.SET_NULL, null=True, related_name='res_spec')
+    resource = models.ForeignKey(Resource, on_delete=models.SET_NULL, null=True, related_name='res_specs')
+    specification = models.ForeignKey(Specification, on_delete=models.SET_NULL, null=True, related_name='res_specs')
     amount = models.DecimalField(max_digits=8, decimal_places=2)
 
     def __str__(self):
         return f"{self.resource} - {self.specification}"
-
-
-class ResourceSpecificationAssembled(models.Model):
-    res_spec = models.ForeignKey(ResourceSpecification, on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=8, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.res_spec}: {self.amount}"
 
 
 class Order(models.Model):
@@ -221,7 +220,7 @@ class OrderAction(models.Model):
         ASSEMBLING_SPECIFICATION = 'ASP', 'Assembling specification'
         DISASSEMBLING_SPECIFICATION = 'DSS', 'Disassembling specification'
 
-    order = models.ForeignKey(Specification,
+    order = models.ForeignKey(Order,
                               on_delete=models.CASCADE,
                               related_name='order_actions',
                               null=True)
@@ -242,4 +241,5 @@ class File(models.Model):
 
     file = models.FileField(blank=False, null=False)
     direction = models.CharField(choices=Direction.choices, max_length=3, default=Direction.RESOURCE_ADD)
+    operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
