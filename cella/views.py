@@ -1,7 +1,7 @@
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from django.http import Http404
 from rest_framework import filters, status
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView, UpdateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 import pandas as pd
@@ -13,6 +13,8 @@ from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWi
 from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
 from .utils.exceptions import NoParameter
+
+from .models import Test1, Test2
 
 
 # Resources
@@ -37,7 +39,7 @@ class ResourceCreateView(CreateAPIView):
         serializer.save(request=self.request)
 
 
-class ResourceUpdateView(RetrieveUpdateAPIView):
+class ResourceUpdateView(UpdateAPIView):
     serializer_class = ResourceSerializer
 
     def perform_update(self, serializer):
@@ -46,7 +48,7 @@ class ResourceUpdateView(RetrieveUpdateAPIView):
     def get_object(self):
         r_id = self.kwargs['r_id']
         try:
-            resource = Resources.detail(r_id)
+            resource = Resources.get(r_id)
         except Resource.DoesNotExist:
             raise Http404()
         self.check_object_permissions(request=self.request, obj=resource)
@@ -102,7 +104,7 @@ class ResourceSetCostView(APIView):
         value = data.get('cost', None)
         if value is not None:
 
-            cost = Resources.set_cost(r_id, value, request.user)
+            cost, _ = Resources.set_cost(r_id, value, request.user)
             return Response(data={'id': r_id, 'cost': cost.value}, status=status.HTTP_202_ACCEPTED)
         else:
             raise NoParameter()
@@ -114,20 +116,18 @@ class ResourceAddAmountView(APIView):
         data = request.data
         r_id = data.get('id')
         delta_amount = data.get('amount')
-        amount = Resources.change_amount(r_id, delta_amount, user=request.user)
-        return Response(data={'id': r_id, 'amount': amount.value}, status=status.HTTP_202_ACCEPTED)
+        amount, _ = Resources.change_amount(r_id, delta_amount, user=request.user)
+        return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
 
 
 class ResourceVerifyCostView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        r_id = data.get('id', None)
-        value = data.get('verify', None)
-        if value is not None:
-
-            Resources.verify_cost(r_id, request.user)
-            return Response(data={'id': r_id, 'verified': True}, status=status.HTTP_202_ACCEPTED)
+        ids = data.get('ids', None)
+        if ids is not None:
+            Resources.verify_cost(ids, request.user)
+            return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
         else:
             raise NoParameter()
 
@@ -256,7 +256,7 @@ class SpecificationSetCategoryView(APIView):
         data = request.data
         s_ids = data['ids']
         category = data['category']
-        Specifications.set_category(s_ids, category)
+        Specifications.set_category_many(s_ids, category, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
 
@@ -381,3 +381,17 @@ class OrderCreateView(CreateAPIView):
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)
+
+
+class TestView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        with transaction.atomic():
+            t1 = Test1.objects.create(test='ew', var=23)
+            t2 = Test2(tt='1', bb=2.3, v=t1)
+            t3 = Test2(tt='2', bb=4.2, v=t1)
+            a = [t2, t3]
+            Test2.objects.bulk_create(a)
+
+        return Response(data={"da": "yes"}, status=status.HTTP_200_OK)
+

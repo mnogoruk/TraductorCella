@@ -5,31 +5,25 @@ from .models import (Operator,
                      ResourceProvider,
                      Resource,
                      ResourceCost,
-                     ResourceAmount,
                      ResourceAction,
                      SpecificationCategory,
                      Specification,
-                     SpecificationPrice,
                      SpecificationAction,
                      ResourceSpecification,
                      Order,
                      OrderSpecification,
                      OrderAction,
-                     SpecificationCoefficient,
-                     File)
+                     File, Test2, Test1)
 
 admin.site.register(Operator)
 
 admin.site.register(ResourceProvider)
 admin.site.register(Resource)
 admin.site.register(ResourceCost)
-admin.site.register(ResourceAmount)
 admin.site.register(ResourceAction)
 
 admin.site.register(SpecificationCategory)
 admin.site.register(Specification)
-admin.site.register(SpecificationPrice)
-admin.site.register(SpecificationCoefficient)
 admin.site.register(SpecificationAction)
 
 admin.site.register(ResourceSpecification)
@@ -39,3 +33,6 @@ admin.site.register(OrderSpecification)
 admin.site.register(OrderAction)
 
 admin.site.register(File)
+
+admin.site.register(Test1)
+admin.site.register(Test2)
