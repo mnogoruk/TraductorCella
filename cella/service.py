@@ -1,6 +1,7 @@
 from typing import List, Dict
 from rest_framework.exceptions import APIException
 from django.utils.translation import gettext_lazy as _
+import pandas as pd
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper, Min
@@ -14,18 +15,29 @@ from .models import (Operator,
                      SpecificationAction,
                      SpecificationCategory,
                      ResourceSpecification,
+                     OrderSource,
                      Order,
                      OrderSpecification,
                      OrderAction)
 from django.db import IntegrityError, transaction, DatabaseError
 
 
-def amounts(objects, amount_list):
+def resource_amounts(objects, amount_list):
     ret = []
     for obj in objects:
         for pair in amount_list:
             if pair['id'] == obj.id:
-                ret.append({'obj': obj, 'amount': pair['amount']})
+                ret.append({'resource': obj, 'amount': pair['amount']})
+                break
+    return ret
+
+
+def product_amounts(objects, amount_list):
+    ret = []
+    for obj in objects:
+        for pair in amount_list:
+            if pair['product_id'] == obj.product_id:
+                ret.append({'specification': obj, 'amount': pair['amount']})
                 break
     return ret
 
@@ -300,6 +312,46 @@ class Resources:
     def bulk_delete(cls, ids, user):
         Resource.objects.filter(id__in=ids).delete()
 
+    @classmethod
+    def create_from_excel(cls, file):
+        excel = pd.read_excel(file)
+
+        errors = []
+
+        try:
+            with transaction.atomic():
+                actions = []
+                resources = []
+                costs = []
+                providers = []
+
+                for x in range(excel.shape[0]):
+                    row = excel.iloc[x]
+                    obj = dict()
+                    if row['Спецификация / Ресурс'].lower() == 'resource':
+                        obj = dict()
+
+                        obj['name'] = row['Название']
+                        obj['external_id'] = row['ID']
+
+                        # if pd.isnull(row['Цена']):
+                        #     obj['price'] = None
+                        # else:
+                        #     obj['price'] = row['Цена']
+
+                        if pd.isnull(row['Количество ']):
+                            obj['amount'] = None
+                        else:
+                            obj['amount'] = row['Количество ']
+
+                        if pd.isnull(row['Поставщик']):
+                            obj['provider'] = None
+                        else:
+                            obj['provider'] = row['Поставщик']
+
+        except DatabaseError as ex:
+            raise cls.CreateException(ex)
+
 
 class Specifications:
     class CreateException(Exception):
@@ -522,16 +574,13 @@ class Specifications:
                 _, price_action = cls.set_price(specification, price, operator, False)
                 actions.append(price_action)
 
-                res_specs = []
-                _resources = []
-
                 if resources is not None and len(resources) != 0:
-
+                    res_specs = []
                     resource_objects = Resource.objects.prefetch_related('resourcecost_set').filter(
                         id__in=map(lambda x: x['id'], resources))
-                    res_specs_dict = amounts(resource_objects, resources)
+                    res_specs_dict = resource_amounts(resource_objects, resources)
                     for resource in res_specs_dict:
-                        res = resource['obj']
+                        res = resource['resource']
                         res.cost = res.resourcecost_set.last().value
                         res_specs.append(
                             ResourceSpecification(
@@ -540,11 +589,9 @@ class Specifications:
                                 specification=specification
                             )
                         )
-                        _resources.append({'resource': res, 'amount': resource['amount']})
 
-                    ResourceSpecification.objects.bulk_create(res_specs)
-
-                specification.resources = _resources
+                        specification.resources = res_specs_dict
+                        ResourceSpecification.objects.bulk_create(res_specs)
 
                 SpecificationAction.objects.create(
                     specification=specification,
@@ -743,15 +790,22 @@ class Orders:
     class OrderDoesNotExist(ObjectDoesNotExist):
         pass
 
+    class CreateException(Exception):
+        pass
+
     @classmethod
     def get(cls, order):
         if not isinstance(order, Order):
             try:
-                return Order.objects.get(id=order)
+                return Order.objects.select_related('source').get(id=order)
             except IntegrityError:
                 raise cls.OrderDoesNotExist()
         else:
             return order
+
+    @classmethod
+    def sources(cls):
+        return OrderSource.objects.all()
 
     @classmethod
     def list(cls):
@@ -895,7 +949,7 @@ class Orders:
             res_specs = specification.res_specs
 
             if specification.amount > order_spec.amount:
-                Specifications.set_amount(specification, specification.amount - order_spec.amount, operator, False)
+                Specifications.set_amount(specification, specification.amount - order_spec.amount, operator)
                 continue
 
             else:
@@ -943,31 +997,45 @@ class Orders:
         order.save()
 
     @classmethod
-    def create(cls, external_id, source: str = None, products: List[Dict[str, str]] = None):
+    def create(cls, external_id, source: str = None, products: List[Dict[str, str]] = None, user=None):
+        try:
+            with transaction.atomic():
+                if source is not None and source != '':
+                    source = OrderSource.objects.get_or_create(name=source)[0]
+                else:
+                    source = None
 
-        order = Order.objects.create(external_id=external_id,
-                                     source=source,
-                                     status=Order.OrderStatus.INACTIVE)
+                order = Order.objects.create(
+                    external_id=external_id,
+                    status=Order.OrderStatus.INACTIVE,
+                    source=source)
 
-        order_specs = []
-        _specs = []
+                OrderAction.objects.create(
+                    order=order,
+                    action_type=OrderAction.ActionType.CREATE,
+                    operator=Operators.get_operator(user)
+                )
 
-        for product in products:
-            order_spec = OrderSpecification(
-                order=order,
-                specification=Specification.objects.get(
-                    product_id=product['product_id'],
-                    is_active=True
-                ),
-                amount=product['amount']
-            )
-            order_specs.append(
-                order_spec
-            )
-            _specs.append({'specification': order_spec, 'amount': product['amount']})
+                if products is not None and len(products) != 0:
+                    order_specs = []
+                    specifications_objects = Specification.objects.filter(
+                        product_id__in=map(lambda x: x['product_id'], products), is_active=True)
+                    order_specs_dict = product_amounts(specifications_objects, products)
 
-        OrderSpecification.objects.bulk_create(order_specs)
-        order.specifications = _specs
+                    for product in order_specs_dict:
+                        order_spec = OrderSpecification(
+                            order=order,
+                            specification=product['specification'],
+                            amount=product['amount']
+                        )
+
+                        order_specs.append(order_spec)
+
+                    OrderSpecification.objects.bulk_create(order_specs)
+                    order.specifications = order_specs_dict
+
+        except DatabaseError as ex:
+            raise cls.CreateException(ex)
         return order
 
     @classmethod

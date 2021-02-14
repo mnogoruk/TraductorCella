@@ -3,7 +3,7 @@ from rest_framework.validators import UniqueValidator
 
 from .service import Resources, Specifications, Orders
 from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory, File, Order, \
-    OrderSpecification
+    OrderSpecification, OrderSource
 
 
 class ProviderSerializer(serializers.ModelSerializer):
@@ -142,7 +142,8 @@ class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
 class SpecificationDetailSerializer(serializers.ModelSerializer):
     resources = SpecificationResourceSerializer(many=True, read_only=True, allow_null=True)
     price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=0)
-    coefficient = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=0)
+    coefficient = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True,
+                                           min_value=0)
     category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     category = SpecificationCategorySerializer(read_only=True, required=False)
     is_active = serializers.BooleanField(read_only=True)
@@ -152,7 +153,13 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
 
     def validate_resources_create(self, value):
         if len(value) == 0:
-            raise serializers.ValidationError("List can`t br empty.")
+            raise serializers.ValidationError('Resources can`t be empty.')
+        else:
+            ids = []
+            for pair in value:
+                if pair['id'] in ids:
+                    raise serializers.ValidationError('Resource duplicates.')
+                ids.append(pair['id'])
         return value
 
     class Meta:
@@ -223,21 +230,43 @@ class OrderSpecificationCreateUpdateSerializer(serializers.Serializer):
         pass
 
 
+class OrderSourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderSource
+        fields = '__all__'
+
+
 class OrderSerializer(serializers.ModelSerializer):
     order_specification = OrderSpecificationSerializer(many=True, read_only=True)
     specifications_create = OrderSpecificationCreateUpdateSerializer(write_only=True, many=True)
+    source = OrderSourceSerializer(read_only=True)
+    source_name = serializers.CharField(max_length=100, write_only=True, allow_null=True, required=False,
+                                        allow_blank=True)
 
     def create(self, validated_data):
         order = Orders.create(
             external_id=validated_data['external_id'],
-            source=validated_data['source'],
+            source=validated_data['source_name'],
             products=validated_data['specifications_create']
         )
         return order
 
+    def validate_specifications_create(self, value):
+        if len(value) == 0:
+            raise serializers.ValidationError('Products can`t be empty.')
+        else:
+            specs = []
+            for pair in value:
+                if pair['product_id'] in specs:
+                    raise serializers.ValidationError('Products duplicates.')
+                else:
+                    specs.append(pair['product_id'])
+        return value
+
     class Meta:
         model = Order
         fields = '__all__'
+        read_only_fields = ['status']
 
 
 class FileSerializer(serializers.ModelSerializer):

@@ -42,6 +42,7 @@ class Resource(models.Model):
     name = models.CharField(max_length=100)
     external_id = models.CharField(max_length=100, unique=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=.0)
+    amount_limit = models.DecimalField(max_digits=12, decimal_places=2, default=10)
 
     def __str__(self):
         return f"{self.name} - {self.external_id}"
@@ -138,12 +139,19 @@ class SpecificationAction(models.Model):
 
 
 class ResourceSpecification(models.Model):
-    resource = models.ForeignKey(Resource, on_delete=models.SET_NULL, null=True, related_name='res_specs')
-    specification = models.ForeignKey(Specification, on_delete=models.SET_NULL, null=True, related_name='res_specs')
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, null=True, related_name='res_specs')
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, null=True, related_name='res_specs')
     amount = models.DecimalField(max_digits=8, decimal_places=2)
 
     def __str__(self):
         return f"{self.resource} - {self.specification}"
+
+
+class OrderSource(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.name}"
 
 
 class Order(models.Model):
@@ -159,7 +167,7 @@ class Order(models.Model):
     external_id = models.CharField(max_length=100)
     status = models.CharField(max_length=3, choices=OrderStatus.choices, default=OrderStatus.INACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
-    source = models.CharField(max_length=100, default='Amazon')
+    source = models.ForeignKey(OrderSource, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return f"{self.external_id}"
@@ -212,8 +220,7 @@ class Test2(models.Model):
     v = models.ForeignKey(Test1, on_delete=models.CASCADE, null=True)
 
 
-class File(
-    models.Model):
+class File(models.Model):
     class Direction(models.TextChoices):
         RESOURCE_ADD = 'RAD', 'Resource add'
 

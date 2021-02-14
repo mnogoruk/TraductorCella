@@ -11,6 +11,7 @@ from .models import (Operator,
                      SpecificationAction,
                      ResourceSpecification,
                      Order,
+                     OrderSource,
                      OrderSpecification,
                      OrderAction,
                      File, Test2, Test1)
@@ -29,6 +30,7 @@ admin.site.register(SpecificationAction)
 admin.site.register(ResourceSpecification)
 
 admin.site.register(Order)
+admin.site.register(OrderSource)
 admin.site.register(OrderSpecification)
 admin.site.register(OrderAction)
 
