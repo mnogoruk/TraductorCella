@@ -627,7 +627,7 @@ class Specifications:
                         res = resource['resource']
                         res.cost = res.resourcecost_set.last().value
                         res_specs.append(
-                            ResourceSpecification(
+                            ResourceSpecification.objects.create(
                                 resource=res,
                                 amount=resource['amount'],
                                 specification=specification
@@ -635,7 +635,7 @@ class Specifications:
                         )
 
                         specification.resources = res_specs_dict
-                        ResourceSpecification.objects.bulk_create(res_specs)
+
 
                 SpecificationAction.objects.create(
                     specification=specification,
