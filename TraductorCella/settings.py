@@ -64,7 +64,6 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'TraductorCella.urls'
 
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -132,3 +131,42 @@ STATIC_URL = '/static/'
 
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'console': {
+            'format': "%(levelname)-8s | %(name)-24s | %(process)-6d | %(thread)-6d | %(asctime)s | %(funcName)s | "
+                      "%(message)s"
+        },
+        'file': {
+            'format': "%(levelname)-8s | %(name)-24s | %(process)-6d | %(thread)-6d | %(asctime)s | %(funcName)s | "
+                      "%(message)s"
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'console'
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'formatter': 'file',
+            'filename': 'debug.log'
+        }
+    },
+    'loggers': {
+        '': {
+            'level': 'WARNING',
+            'handlers': ['console', 'file'],
+            'propagate': True
+        },
+        'django.request': {
+            'level': 'WARNING',
+            'handlers': ['console', 'file'],
+            'propagate': False
+        }
+    }
+}

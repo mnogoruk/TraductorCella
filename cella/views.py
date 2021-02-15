@@ -14,8 +14,10 @@ from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
 from .utils.exceptions import NoParameterSpecified, ParameterExceptions, WrongParameterType, WrongParameterValue, \
     CreateException
-
+import logging
 from .models import Test1, Test2
+
+logger = logging.getLogger(__name__)
 
 
 # Resources
@@ -27,6 +29,7 @@ class ResourceDetailView(RetrieveAPIView):
         try:
             resource = Resources.detail(r_id)
         except Resource.DoesNotExist:
+            logger.warning(f"Can`t get object 'Resource' with id: {r_id}.")
             raise Http404()
         self.check_object_permissions(request=self.request, obj=resource)
 
@@ -51,6 +54,7 @@ class ResourceUpdateView(UpdateAPIView):
         try:
             resource = Resources.get(r_id)
         except Resource.DoesNotExist:
+            logger.warning("Can`t get object 'Resource'.")
             raise Http404()
         self.check_object_permissions(request=self.request, obj=resource)
 
@@ -104,10 +108,12 @@ class ResourceSetCostView(APIView):
         try:
             r_id = data['id']
         except KeyError as ex:
+            logger.warning(f"'{'id'}' not specified")
             raise NoParameterSpecified('id')
         try:
             value = data['cost']
         except KeyError as ex:
+            logger.warning(f"'{'cost'}' not specified")
             raise NoParameterSpecified('cost')
         if value is not None:
 
@@ -124,8 +130,10 @@ class ResourceAddAmountView(APIView):
         try:
             r_id = data['id']
         except KeyError as ex:
+            logger.warning(f"'{'id'}' not specified")
             raise NoParameterSpecified('id')
         try:
+            logger.warning(f"'{'amount'}' not specified")
             delta_amount = data['amount']
         except KeyError as ex:
             raise NoParameterSpecified('amount')
@@ -163,25 +171,7 @@ class ResourceExelUploadView(CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         file = request.FILES['file']
-        print(request.user)
         Resources.create_from_excel(file, request.user)
-
-        # excel = pd.read_excel(file)
-        # try:
-        #     data = []
-        #     for row in range(excel.shape[0]):
-        #         r = excel.iloc[row]
-        #         data.append({
-        #             'resource_name': r['Название'].strip(),
-        #             'external_id': r['ID'].strip(),
-        #             'cost_value': float(r['Цена']),
-        #             'amount_value': float(r['Количество']),
-        #             'provider_name': r['Поставщик'].strip()
-        #         })
-        #     Resources.bulk_create(data=data, user=request.user)
-        # except Exception as ex:
-        #     return Response(data={'detail': 'Ошибка обработки файла'},
-        #                     status=status.HTTP_400_BAD_REQUEST)
 
         return super().post(request, *args, **kwargs)
 

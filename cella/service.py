@@ -416,10 +416,14 @@ class Specifications:
         pass
 
     @classmethod
-    def get(cls, specification):
+    def get(cls, specification, related=None, prefetched=None):
+        if related is None:
+            related = []
+        if prefetched is None:
+            prefetched = []
         if not isinstance(specification, Specification):
             try:
-                return Specification.objects.select_related('category').get(id=specification, is_active=True)
+                return Specification.objects.select_related('category', *related).prefetch_related(*prefetched).get(id=specification, is_active=True)
             except IntegrityError:
                 raise cls.SpecificationDoesNotExist()
         else:
@@ -528,7 +532,7 @@ class Specifications:
 
     @classmethod
     def detail(cls, specification):
-        specification = cls.get(specification)
+        specification = cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
 
         query_res_spec = ResourceSpecification.objects.filter(specification=specification, resource=OuterRef('pk'))
         cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
@@ -541,6 +545,7 @@ class Specifications:
 
         resources = [{'resource': resource, 'amount': resource.needed_amount} for resource in resources]
         specification.resources = resources
+        specification.available_to_assemble = cls.assemble_info(specification)
 
         return specification
 
@@ -752,10 +757,7 @@ class Specifications:
 
     @classmethod
     def assemble_info(cls, specification):
-        if not isinstance(specification, Specification):
-            specification = Specification.objects.prefetch_related(
-                'res_specs__resource',
-            ).get(id=specification)
+        cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
 
         min_amount = None
 
