@@ -8,7 +8,7 @@ class Operator(models.Model):
                                 related_name='operator',
                                 null=True,
                                 blank=True)
-    name = models.CharField(max_length=100, null=True, blank=True)
+    name = models.CharField(max_length=150, null=True, blank=True)
 
     def __str__(self):
         return self.name if self.name is not None else getattr(self.user, 'username')
@@ -39,7 +39,7 @@ class Resource(models.Model):
                                  related_name='resources',
                                  null=True,
                                  blank=True)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=400)
     external_id = models.CharField(max_length=100, unique=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=.0)
     amount_limit = models.DecimalField(max_digits=12, decimal_places=2, default=10)
@@ -74,7 +74,7 @@ class ResourceAction(models.Model):
                                  on_delete=models.CASCADE,
                                  related_name='resource_actions')
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
-    value = models.CharField(max_length=100, null=True)
+    value = models.CharField(max_length=300, null=True)
     time_stamp = models.DateTimeField(auto_now_add=True)
     operator = models.ForeignKey(Operator,
                                  on_delete=models.SET_NULL,
@@ -86,15 +86,15 @@ class ResourceAction(models.Model):
 
 
 class SpecificationCategory(models.Model):
-    name = models.CharField(max_length=100)
-    coefficient = models.DecimalField(max_digits=8, decimal_places=2, null=True)
+    name = models.CharField(max_length=150)
+    coefficient = models.DecimalField(max_digits=12, decimal_places=2, null=True)
 
     def __str__(self):
         return self.name
 
 
 class Specification(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=400)
     product_id = models.CharField(max_length=50)
     category = models.ForeignKey(SpecificationCategory,
                                  on_delete=models.SET_NULL,
@@ -128,7 +128,7 @@ class SpecificationAction(models.Model):
                                       null=True)
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     time_stamp = models.DateTimeField(auto_now_add=True)
-    value = models.CharField(max_length=100, null=True)
+    value = models.CharField(max_length=300, null=True)
     operator = models.ForeignKey(Operator,
                                  on_delete=models.SET_NULL,
                                  related_name='specification_actions',
@@ -141,14 +141,14 @@ class SpecificationAction(models.Model):
 class ResourceSpecification(models.Model):
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE, null=True, related_name='res_specs')
     specification = models.ForeignKey(Specification, on_delete=models.CASCADE, null=True, related_name='res_specs')
-    amount = models.DecimalField(max_digits=8, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
 
     def __str__(self):
         return f"{self.resource} - {self.specification}"
 
 
 class OrderSource(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=150)
 
     def __str__(self):
         return f"{self.name}"
@@ -199,7 +199,7 @@ class OrderAction(models.Model):
                               null=True)
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     time_stamp = models.DateTimeField(auto_now_add=True)
-    value = models.CharField(max_length=100, null=True, default=None)
+    value = models.CharField(max_length=300, null=True, default=None)
     operator = models.ForeignKey(Operator,
                                  on_delete=models.SET_NULL,
                                  related_name='order_actions',
