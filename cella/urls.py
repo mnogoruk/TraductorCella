@@ -7,7 +7,7 @@ from .views import ResourceDetailView, ResourceCreateView, ResourceUpdateView, R
     SpecificationSetCoefficientView, OrderDetailView, OrderListView, OrderDisAssembleSpecificationView, \
     OrderAssembleSpecificationView, OrderManageActionView, SpecificationAssembleInfoView, SpecificationBuildSetView, \
     OrderAssemblingInfoView, OrderBulkDeleteView, SpecificationSetCategoryView, ResourceBulkDeleteView, \
-    SpecificationBulkDeleteView, SpecificationCreateCategoryView, OrderCreateView
+    SpecificationBulkDeleteView, SpecificationCreateCategoryView, OrderCreateView, TestView
 
 urlpatterns = [
 
@@ -45,5 +45,7 @@ urlpatterns = [
     path('order/disassemble-specification/', OrderDisAssembleSpecificationView.as_view()),
     path('order/action/', OrderManageActionView.as_view()),
     path('order/assemble-info/<int:o_id>/', OrderAssemblingInfoView.as_view()),
-    path('order/delete/', OrderBulkDeleteView.as_view())
+    path('order/delete/', OrderBulkDeleteView.as_view()),
+
+    path('test/', TestView.as_view())
 ]

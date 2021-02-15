@@ -3,7 +3,7 @@ from rest_framework.validators import UniqueValidator
 
 from .service import Resources, Specifications, Orders
 from .models import Resource, ResourceProvider, ResourceAction, Specification, SpecificationCategory, File, Order, \
-    OrderSpecification
+    OrderSpecification, OrderSource
 
 
 class ProviderSerializer(serializers.ModelSerializer):
@@ -25,11 +25,11 @@ class ResourceWithUnverifiedCostSerializer(serializers.ModelSerializer):
     old_cost = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
     new_cost = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
     amount = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
-    unverified = serializers.BooleanField()
+    verified = serializers.BooleanField()
 
     class Meta:
         model = Resource
-        fields = ['id', 'name', 'external_id', 'provider', 'old_cost', 'new_cost', 'amount', 'unverified']
+        fields = ['id', 'name', 'external_id', 'provider', 'old_cost', 'new_cost', 'amount', 'verified']
 
 
 class ResourceSerializer(serializers.ModelSerializer):
@@ -43,8 +43,8 @@ class ResourceSerializer(serializers.ModelSerializer):
                                         )
     provider = ProviderSerializer(read_only=True, allow_null=True)
     provider_name = serializers.CharField(write_only=True, required=False, allow_null=True, default=None)
-    cost = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, min_value=0)
-    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, min_value=0)
+    cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
     last_change_cost = serializers.DateTimeField(read_only=True)
     last_change_amount = serializers.DateTimeField(read_only=True)
     verified = serializers.BooleanField(allow_null=True, read_only=True)
@@ -77,12 +77,13 @@ class ResourceSerializer(serializers.ModelSerializer):
         if provider_name is not None:
             update_data['provider_name'] = provider_name
 
-        resource = Resources.update_fields(r_id=instance.id, **update_data)
+        resource = Resources.update_fields(instance, **update_data)
 
         if cost is not None:
-            Resources.set_cost(r_id=instance.id, cost_value=cost, user=user)
+            Resources.set_cost(instance, cost_value=cost, user=user)
+
         if amount is not None:
-            Resources.set_amount(r_id=instance.id, amount_value=amount, user=user)
+            Resources.set_amount(instance, amount_value=amount, user=user)
 
         return resource
 
@@ -140,16 +141,26 @@ class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
 
 class SpecificationDetailSerializer(serializers.ModelSerializer):
     resources = SpecificationResourceSerializer(many=True, read_only=True, allow_null=True)
-    price = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
-    coefficient = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
-    price_time_stamp = serializers.DateTimeField(read_only=True)
-    coefficient_time_stamp = serializers.DateTimeField(read_only=True)
+    price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=0)
+    coefficient = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True,
+                                           min_value=0)
     category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     category = SpecificationCategorySerializer(read_only=True, required=False)
     is_active = serializers.BooleanField(read_only=True)
     resources_create = SpecificationResourceCreateUpdateSerializer(many=True, write_only=True)
     verified = serializers.BooleanField(read_only=True, allow_null=True)
-    storage_amount = serializers.IntegerField(allow_null=True)
+    amount = serializers.IntegerField(allow_null=True, required=False, default=0, min_value=0)
+
+    def validate_resources_create(self, value):
+        if len(value) == 0:
+            raise serializers.ValidationError('Resources can`t be empty.')
+        else:
+            ids = []
+            for pair in value:
+                if pair['id'] in ids:
+                    raise serializers.ValidationError('Resource duplicates.')
+                ids.append(pair['id'])
+        return value
 
     class Meta:
         model = Specification
@@ -163,7 +174,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             coefficient=validated_data['coefficient'],
             resources=validated_data['resources_create'],
             category_name=validated_data['category_name'],
-            storage_amount=validated_data['storage_amount'],
+            amount=validated_data['amount'],
             user=validated_data['request'].user
         )
         return spec
@@ -174,10 +185,8 @@ class SpecificationListSerializer(serializers.ModelSerializer):
     prime_cost = serializers.DecimalField(max_digits=8, decimal_places=2)
     price = serializers.DecimalField(max_digits=8, decimal_places=2)
     coefficient = serializers.DecimalField(max_digits=8, decimal_places=2)
-    price_time_stamp = serializers.DateTimeField()
-    coefficient_time_stamp = serializers.DateTimeField()
     verified = serializers.BooleanField(allow_null=True, read_only=True)
-    storage_amount = serializers.IntegerField(allow_null=True)
+    amount = serializers.IntegerField(allow_null=True)
 
     class Meta:
         model = Specification
@@ -221,21 +230,43 @@ class OrderSpecificationCreateUpdateSerializer(serializers.Serializer):
         pass
 
 
+class OrderSourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderSource
+        fields = '__all__'
+
+
 class OrderSerializer(serializers.ModelSerializer):
     order_specification = OrderSpecificationSerializer(many=True, read_only=True)
     specifications_create = OrderSpecificationCreateUpdateSerializer(write_only=True, many=True)
+    source = OrderSourceSerializer(read_only=True)
+    source_name = serializers.CharField(max_length=100, write_only=True, allow_null=True, required=False,
+                                        allow_blank=True)
 
     def create(self, validated_data):
         order = Orders.create(
             external_id=validated_data['external_id'],
-            source=validated_data['source'],
+            source=validated_data['source_name'],
             products=validated_data['specifications_create']
         )
         return order
 
+    def validate_specifications_create(self, value):
+        if len(value) == 0:
+            raise serializers.ValidationError('Products can`t be empty.')
+        else:
+            specs = []
+            for pair in value:
+                if pair['product_id'] in specs:
+                    raise serializers.ValidationError('Products duplicates.')
+                else:
+                    specs.append(pair['product_id'])
+        return value
+
     class Meta:
         model = Order
         fields = '__all__'
+        read_only_fields = ['status']
 
 
 class FileSerializer(serializers.ModelSerializer):

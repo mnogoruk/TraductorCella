@@ -1,7 +1,7 @@
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from django.http import Http404
 from rest_framework import filters, status
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, RetrieveUpdateAPIView, UpdateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 import pandas as pd
@@ -12,7 +12,10 @@ from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWi
     SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer, OrderSerializer
 from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
-from .utils.exceptions import NoParameter
+from .utils.exceptions import NoParameterSpecified, ParameterExceptions, WrongParameterType, WrongParameterValue, \
+    CreateException
+
+from .models import Test1, Test2
 
 
 # Resources
@@ -37,7 +40,7 @@ class ResourceCreateView(CreateAPIView):
         serializer.save(request=self.request)
 
 
-class ResourceUpdateView(RetrieveUpdateAPIView):
+class ResourceUpdateView(UpdateAPIView):
     serializer_class = ResourceSerializer
 
     def perform_update(self, serializer):
@@ -46,7 +49,7 @@ class ResourceUpdateView(RetrieveUpdateAPIView):
     def get_object(self):
         r_id = self.kwargs['r_id']
         try:
-            resource = Resources.detail(r_id)
+            resource = Resources.get(r_id)
         except Resource.DoesNotExist:
             raise Http404()
         self.check_object_permissions(request=self.request, obj=resource)
@@ -98,38 +101,53 @@ class ResourceSetCostView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        r_id = data.get('id', None)
-        value = data.get('cost', None)
+        try:
+            r_id = data['id']
+        except KeyError as ex:
+            raise NoParameterSpecified('id')
+        try:
+            value = data['cost']
+        except KeyError as ex:
+            raise NoParameterSpecified('cost')
         if value is not None:
 
-            cost = Resources.set_cost(r_id, value, request.user)
+            cost, _ = Resources.set_cost(r_id, value, request.user)
             return Response(data={'id': r_id, 'cost': cost.value}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class ResourceAddAmountView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        r_id = data.get('id')
-        delta_amount = data.get('amount')
-        amount = Resources.change_amount(r_id, delta_amount, user=request.user)
-        return Response(data={'id': r_id, 'amount': amount.value}, status=status.HTTP_202_ACCEPTED)
+        try:
+            r_id = data['id']
+        except KeyError as ex:
+            raise NoParameterSpecified('id')
+        try:
+            delta_amount = data['amount']
+        except KeyError as ex:
+            raise NoParameterSpecified('amount')
+        amount, _ = Resources.change_amount(r_id, delta_amount, user=request.user)
+        return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
 
 
 class ResourceVerifyCostView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        r_id = data.get('id', None)
-        value = data.get('verify', None)
-        if value is not None:
-
-            Resources.verify_cost(r_id, request.user)
-            return Response(data={'id': r_id, 'verified': True}, status=status.HTTP_202_ACCEPTED)
+        try:
+            ids = data['ids']
+        except KeyError as ex:
+            raise NoParameterSpecified('ids')
+        if not isinstance(ids, list):
+            raise ParameterExceptions(detail="'ids' must be list object.")
+        if ids is not None:
+            Resources.verify_cost(ids, request.user)
+            return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class ProviderListView(ListAPIView):
@@ -139,28 +157,31 @@ class ProviderListView(ListAPIView):
         return Resources.providers()
 
 
+# TODO: ...
 class ResourceExelUploadView(CreateAPIView):
     serializer_class = FileSerializer
 
     def post(self, request, *args, **kwargs):
         file = request.FILES['file']
-        excel = pd.read_excel(file)
-        print(excel)
-        try:
-            data = []
-            for row in range(excel.shape[0]):
-                r = excel.iloc[row]
-                data.append({
-                    'resource_name': r['Название'].strip(),
-                    'external_id': r['ID'].strip(),
-                    'cost_value': float(r['Цена']),
-                    'amount_value': float(r['Количество']),
-                    'provider_name': r['Поставщик'].strip()
-                })
-            Resources.bulk_create(data=data, user=request.user)
-        except Exception as ex:
-            return Response(data={'detail': 'Ошибка обработки файла'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        print(request.user)
+        Resources.create_from_excel(file, request.user)
+
+        # excel = pd.read_excel(file)
+        # try:
+        #     data = []
+        #     for row in range(excel.shape[0]):
+        #         r = excel.iloc[row]
+        #         data.append({
+        #             'resource_name': r['Название'].strip(),
+        #             'external_id': r['ID'].strip(),
+        #             'cost_value': float(r['Цена']),
+        #             'amount_value': float(r['Количество']),
+        #             'provider_name': r['Поставщик'].strip()
+        #         })
+        #     Resources.bulk_create(data=data, user=request.user)
+        # except Exception as ex:
+        #     return Response(data={'detail': 'Ошибка обработки файла'},
+        #                     status=status.HTTP_400_BAD_REQUEST)
 
         return super().post(request, *args, **kwargs)
 
@@ -169,7 +190,12 @@ class ResourceBulkDeleteView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        ids = data['ids']
+        try:
+            ids = data['ids']
+        except KeyError as ex:
+            raise NoParameterSpecified('ids')
+        if not isinstance(ids, list):
+            raise ParameterExceptions(detail="'ids' must be list object.")
         Resources.bulk_delete(ids, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
@@ -228,35 +254,56 @@ class SpecificationSetPriceView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        s_id = data.get('id', None)
-        value = data.get('price', None)
+        try:
+            s_id = data['id']
+        except KeyError as ex:
+            raise NoParameterSpecified('id')
+        try:
+            value = data['price']
+        except KeyError as ex:
+            raise NoParameterSpecified('price')
+
         if value is not None and s_id is not None:
             Specifications.set_price(specification=s_id, price=value, user=request.user)
             return Response(data={'id': s_id, 'price': value}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class SpecificationSetCoefficientView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        s_id = data.get('id', None)
-        value = data.get('coefficient', None)
+        try:
+            s_id = data['id']
+        except KeyError as ex:
+            raise NoParameterSpecified('id')
+        try:
+            value = data['coefficient']
+        except KeyError as ex:
+            raise NoParameterSpecified('coefficient')
         if value is not None and s_id is not None:
             Specifications.set_coefficient(specification=s_id, coefficient=value, user=request.user)
             return Response(data={'id': s_id, 'coefficient': value}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class SpecificationSetCategoryView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        s_ids = data['ids']
-        category = data['category']
-        Specifications.set_category(s_ids, category)
+        try:
+            ids = data['ids']
+        except KeyError as ex:
+            raise NoParameterSpecified('ids')
+        if not isinstance(ids, list):
+            raise ParameterExceptions(detail="'ids' must be list object.")
+        try:
+            category = data['category']
+        except KeyError as ex:
+            raise NoParameterSpecified('category')
+        Specifications.set_category_many(ids, category, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
 
@@ -273,9 +320,15 @@ class SpecificationBuildSetView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
+        try:
+            s_id = data['id']
+        except KeyError as ex:
+            raise NoParameterSpecified(detail='id not specified.')
+        try:
+            amount = data['amount']
+        except KeyError as ex:
+            raise NoParameterSpecified(detail='amount not specified.')
 
-        s_id = data.get('id')
-        amount = data.get('amount')
         from_resources = data.get('from_resources', False)
 
         Specifications.build_set(s_id, amount, from_resources, user=request.user)
@@ -286,7 +339,12 @@ class SpecificationBulkDeleteView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        ids = data['ids']
+        try:
+            ids = data['ids']
+        except KeyError as ex:
+            raise NoParameterSpecified('ids')
+        if not isinstance(ids, list):
+            raise ParameterExceptions(detail="'ids' must be list object.")
         Specifications.bulk_delete(ids, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
@@ -315,34 +373,61 @@ class OrderAssembleSpecificationView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        order_id = data.get('order_id', None)
-        specification_id = data.get('specification_id', None)
+
+        try:
+            order_id = data['order_id']
+        except KeyError as ex:
+            raise NoParameterSpecified('order_id')
+
+        try:
+            specification_id = data.get('specification_id', None)
+        except KeyError as ex:
+            raise NoParameterSpecified('specification_id')
+
         if order_id is not None and specification_id is not None:
             Orders.assemble_specification(order_id, specification_id)
             return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class OrderDisAssembleSpecificationView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        order_id = data.get('order_id', None)
-        specification_id = data.get('specification_id', None)
+
+        try:
+            order_id = data['order_id']
+        except KeyError as ex:
+            raise NoParameterSpecified('order_id')
+
+        try:
+            specification_id = data.get('specification_id', None)
+        except KeyError as ex:
+            raise NoParameterSpecified('specification_id')
+
         if order_id is not None and specification_id is not None:
             Orders.disassemble_specification(order_id, specification_id)
             return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class OrderManageActionView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        order_id = data.get('id', None)
-        action = data.get('action', None)
+
+        try:
+            order_id = data['id']
+        except KeyError as ex:
+            raise NoParameterSpecified('id')
+
+        try:
+            action = data.get('action', None)
+        except KeyError as ex:
+            raise NoParameterSpecified('action')
+
         if order_id is not None and action is not None:
             if action == 'activate':
                 Orders.activate(order_id, request.user)
@@ -351,10 +436,10 @@ class OrderManageActionView(APIView):
             elif action == 'confirm':
                 Orders.confirm(order_id, request.user)
             else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                raise WrongParameterValue('action')
             return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
         else:
-            raise NoParameter()
+            raise NoParameterSpecified()
 
 
 class OrderAssemblingInfoView(APIView):
@@ -371,7 +456,12 @@ class OrderBulkDeleteView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        ids = data['ids']
+        try:
+            ids = data['ids']
+        except KeyError as ex:
+            raise NoParameterSpecified('ids')
+        if not isinstance(ids, list):
+            raise WrongParameterType('ids', 'list')
         Orders.bulk_delete(ids, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
@@ -381,3 +471,16 @@ class OrderCreateView(CreateAPIView):
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)
+
+
+class TestView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        with transaction.atomic():
+            t1 = Test1.objects.create(test='ew', var=23)
+            t2 = Test2(tt='1', bb=2.3, v=t1)
+            t3 = Test2(tt='2', bb=4.2, v=t1)
+            a = [t2, t3]
+            Test2.objects.bulk_create(a)
+
+        return Response(data={"da": "yes"}, status=status.HTTP_200_OK)
