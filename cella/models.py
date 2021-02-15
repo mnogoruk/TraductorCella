@@ -134,6 +134,7 @@ class SpecificationAction(models.Model):
                                  related_name='specification_actions',
                                  null=True)
 
+
     def __str__(self):
         return f"{self.action_type} for {self.specification}"
 
