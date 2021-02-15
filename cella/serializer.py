@@ -150,6 +150,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
     resources_create = SpecificationResourceCreateUpdateSerializer(many=True, write_only=True)
     verified = serializers.BooleanField(read_only=True, allow_null=True)
     amount = serializers.IntegerField(allow_null=True, required=False, default=0, min_value=0)
+    available_to_assemble = serializers.IntegerField(read_only=True, allow_null=True)
 
     def validate_resources_create(self, value):
         if len(value) == 0:
@@ -193,6 +194,12 @@ class SpecificationListSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class SpecificationShortSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Specification
+        fields = '__all__'
+
+
 class SpecificationEditSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=False, allow_null=True)
     product_id = serializers.CharField(required=False, allow_null=True)
@@ -214,6 +221,8 @@ class SpecificationEditSerializer(serializers.ModelSerializer):
 
 
 class OrderSpecificationSerializer(serializers.ModelSerializer):
+    specification = SpecificationShortSerializer()
+
     class Meta:
         model = OrderSpecification
         fields = ['specification', 'amount', 'assembled']
