@@ -20,6 +20,12 @@ from .models import (Operator,
                      OrderSpecification,
                      OrderAction)
 from django.db import IntegrityError, transaction, DatabaseError
+import random, string
+
+
+def random_str(length):
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
 
 
 def resource_amounts(objects, amount_list):
@@ -46,9 +52,9 @@ class Operators:
 
     @classmethod
     def get_operator(cls, user):
+
         if isinstance(user, Operator):
             return user
-
         if user is None:
             operator = Operator.get_system_operator()
         elif user.is_anonymous:
@@ -118,11 +124,12 @@ class Resources:
         return resource.amount, action
 
     @classmethod
-    def set_cost(cls, resource, cost_value, user, save=True):
+    def set_cost(cls, resource, cost_value, user, save=True, verified=False):
         resource = cls.get(resource)
         cost = ResourceCost(
             resource=resource,
-            value=cost_value
+            value=cost_value,
+            verified=verified
         )
 
         action = ResourceAction(
@@ -215,7 +222,7 @@ class Resources:
                     operator=operator
                 ).save()
 
-                cost, cost_action = cls.set_cost(resource, cost_value, operator, False)
+                cost, cost_action = cls.set_cost(resource, cost_value, operator, False, True)
                 cost.verified = True
                 cost.save()
                 cost_action.save()
@@ -313,44 +320,78 @@ class Resources:
         Resource.objects.filter(id__in=ids).delete()
 
     @classmethod
-    def create_from_excel(cls, file):
+    def create_from_excel(cls, file, user=None):
         excel = pd.read_excel(file)
 
         errors = []
 
-        try:
-            with transaction.atomic():
-                actions = []
-                resources = []
-                costs = []
-                providers = []
+        with transaction.atomic():
+            operator = Operators.get_operator(user)
+            actions = []
+            costs = []
+            resources = []
+            provider_dict = {}
+            ext = []
+            for x in range(excel.shape[0]):
 
-                for x in range(excel.shape[0]):
-                    row = excel.iloc[x]
+                row = excel.iloc[x]
+
+                if (not pd.isnull(row['Спецификация / Ресурс'])) and row['Спецификация / Ресурс'].lower() == 'resource':
                     obj = dict()
-                    if row['Спецификация / Ресурс'].lower() == 'resource':
-                        obj = dict()
 
-                        obj['name'] = row['Название']
-                        obj['external_id'] = row['ID']
+                    obj['name'] = row['Название']
 
-                        # if pd.isnull(row['Цена']):
-                        #     obj['price'] = None
-                        # else:
-                        #     obj['price'] = row['Цена']
+                    if pd.isnull(row['ID']):
+                        external_id = random_str(24)
 
-                        if pd.isnull(row['Количество ']):
-                            obj['amount'] = None
+                    else:
+                        external_id = str(int(row['ID']))
+
+                    if external_id in ext:
+                        continue
+                    else:
+                        ext.append(external_id)
+
+                    obj['external_id'] = external_id
+
+                    if pd.isnull(row['Количество ']):
+                        amount_value = 0
+                    else:
+                        amount_value = row['Количество ']
+
+                    if pd.isnull(row['Поставщик']):
+                        provider = None
+                    else:
+                        provider_name = row['Поставщик']
+                        if provider_name not in provider_dict:
+                            provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
+                            provider_dict[provider_name] = provider
                         else:
-                            obj['amount'] = row['Количество ']
+                            provider = provider_dict[provider_name]
 
-                        if pd.isnull(row['Поставщик']):
-                            obj['provider'] = None
-                        else:
-                            obj['provider'] = row['Поставщик']
+                    obj['provider'] = provider
+                    resource = Resource.objects.create(**obj)
 
-        except DatabaseError as ex:
-            raise cls.CreateException(ex)
+                    if pd.isnull(row['Цена']):
+                        cost_value = 0
+                    else:
+                        cost_value = row['Цена']
+
+                    cost, cost_action = cls.set_cost(resource, cost_value, operator, verified=True, save=False)
+                    amount, amount_action = cls.set_amount(resource, amount_value, operator, save=False)
+                    create_action = ResourceAction(
+                        resource=resource,
+                        operator=operator,
+                        action_type=ResourceAction.ActionType.CREATE)
+
+                    costs.append(cost)
+                    actions.append(cost_action)
+                    actions.append(amount_action)
+                    actions.append(create_action)
+                    resources.append(resource)
+            ResourceCost.objects.bulk_create(costs)
+            ResourceAction.objects.bulk_create(actions)
+            Resource.objects.bulk_update(resources, fields=['amount'])
 
 
 class Specifications:

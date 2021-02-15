@@ -12,7 +12,8 @@ from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWi
     SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer, OrderSerializer
 from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
-from .utils.exceptions import NoParameterSpecified, ParameterExceptions, WrongParameterType, WrongParameterValue
+from .utils.exceptions import NoParameterSpecified, ParameterExceptions, WrongParameterType, WrongParameterValue, \
+    CreateException
 
 from .models import Test1, Test2
 
@@ -162,22 +163,25 @@ class ResourceExelUploadView(CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         file = request.FILES['file']
-        excel = pd.read_excel(file)
-        try:
-            data = []
-            for row in range(excel.shape[0]):
-                r = excel.iloc[row]
-                data.append({
-                    'resource_name': r['Название'].strip(),
-                    'external_id': r['ID'].strip(),
-                    'cost_value': float(r['Цена']),
-                    'amount_value': float(r['Количество']),
-                    'provider_name': r['Поставщик'].strip()
-                })
-            Resources.bulk_create(data=data, user=request.user)
-        except Exception as ex:
-            return Response(data={'detail': 'Ошибка обработки файла'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        print(request.user)
+        Resources.create_from_excel(file, request.user)
+
+        # excel = pd.read_excel(file)
+        # try:
+        #     data = []
+        #     for row in range(excel.shape[0]):
+        #         r = excel.iloc[row]
+        #         data.append({
+        #             'resource_name': r['Название'].strip(),
+        #             'external_id': r['ID'].strip(),
+        #             'cost_value': float(r['Цена']),
+        #             'amount_value': float(r['Количество']),
+        #             'provider_name': r['Поставщик'].strip()
+        #         })
+        #     Resources.bulk_create(data=data, user=request.user)
+        # except Exception as ex:
+        #     return Response(data={'detail': 'Ошибка обработки файла'},
+        #                     status=status.HTTP_400_BAD_REQUEST)
 
         return super().post(request, *args, **kwargs)
 

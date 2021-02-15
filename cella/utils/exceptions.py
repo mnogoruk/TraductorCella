@@ -45,3 +45,9 @@ class WrongParameterValue(ParameterExceptions):
             _detail = detail
 
         super(WrongParameterValue, self).__init__(_detail, code)
+
+
+class CreateException(APIException):
+    status_code = 500
+    default_detail = 'Can`t create object'
+    default_code = 'internal_error'
