@@ -9,7 +9,7 @@ import pandas as pd
 from .service import Resources, Specifications, Orders
 from .serializer import ResourceSerializer, ResourceActionSerializer, ResourceWithUnverifiedCostSerializer, \
     SpecificationDetailSerializer, SpecificationListSerializer, ResourceShortSerializer, ProviderSerializer, \
-    SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer, OrderSerializer
+    SpecificationCategorySerializer, SpecificationEditSerializer, FileSerializer, OrderSerializer, OderListSerializer
 from .models import Resource, Specification
 from .utils.pagination import StandardResultsSetPagination
 from .utils.exceptions import NoParameterSpecified, ParameterExceptions, WrongParameterType, WrongParameterValue, \
@@ -352,7 +352,7 @@ class OrderDetailView(RetrieveAPIView):
 
 
 class OrderListView(ListAPIView):
-    serializer_class = OrderSerializer
+    serializer_class = OderListSerializer
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):

@@ -247,6 +247,12 @@ class OrderSourceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class OderListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+
 class OrderSerializer(serializers.ModelSerializer):
     order_specification = OrderSpecificationSerializer(many=True, read_only=True)
     specifications_create = OrderSpecificationCreateUpdateSerializer(write_only=True, many=True)
