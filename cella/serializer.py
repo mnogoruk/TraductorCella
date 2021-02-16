@@ -195,6 +195,8 @@ class SpecificationListSerializer(serializers.ModelSerializer):
 
 
 class SpecificationShortSerializer(serializers.ModelSerializer):
+    res_specs = SpecificationResourceSerializer(many=True)
+
     class Meta:
         model = Specification
         fields = '__all__'

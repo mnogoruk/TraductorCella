@@ -425,7 +425,8 @@ class Specifications:
             prefetched = []
         if not isinstance(specification, Specification):
             try:
-                return Specification.objects.select_related('category', *related).prefetch_related(*prefetched).get(id=specification, is_active=True)
+                return Specification.objects.select_related('category', *related).prefetch_related(*prefetched).get(
+                    id=specification, is_active=True)
             except IntegrityError:
                 raise cls.SpecificationDoesNotExist()
         else:
@@ -905,7 +906,17 @@ class Orders:
         order = Order.objects.prefetch_related(
             'order_specification',
             'order_specification__specification',
+            'order_specification__specification__category',
+            'order_specification__specification__res_specs',
+            'order_specification__specification__res_specs__resource',
+            'order_specification__specification__res_specs__resource__resourcecost_set',
+            'order_specification__specification__res_specs__resource__provider',
+
         ).get(id=order)
+        for oder_spec in order.order_specification.all():
+            for spec_res in oder_spec.specification.res_specs.all():
+                resource = spec_res.resource
+                resource.cost = resource.resourcecost_set.last().value
 
         return order
 
