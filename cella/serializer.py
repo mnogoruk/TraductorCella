@@ -34,13 +34,7 @@ class ResourceWithUnverifiedCostSerializer(serializers.ModelSerializer):
 
 class ResourceSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True)
-    external_id = serializers.CharField(required=True,
-                                        validators=[
-                                            UniqueValidator(
-                                                queryset=Resource.objects.defer('external_id').all()
-                                            )
-                                        ]
-                                        )
+    external_id = serializers.CharField(required=True)
     provider = ProviderSerializer(read_only=True, allow_null=True)
     provider_name = serializers.CharField(write_only=True, required=False, allow_null=True, default=None)
     cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)

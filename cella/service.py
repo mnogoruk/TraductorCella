@@ -1,10 +1,13 @@
 from typing import List, Dict
+
+from django.db.models.functions import Cast
 from rest_framework.exceptions import APIException
 from django.utils.translation import gettext_lazy as _
 import pandas as pd
+import logging
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper, Min
+from django.db.models import Max, Q, Subquery, OuterRef, Exists, Sum, F, ExpressionWrapper, Min, IntegerField
 
 from .models import (Operator,
                      ResourceProvider,
@@ -21,6 +24,8 @@ from .models import (Operator,
                      OrderAction)
 from django.db import IntegrityError, transaction, DatabaseError
 import random, string
+
+logger = logging.getLogger(__name__)
 
 
 def random_str(length):
@@ -77,11 +82,16 @@ class Resources:
         pass
 
     @classmethod
-    def get(cls, resource):
+    def get(cls, resource, related=None, prefetched=None):
+        if prefetched is None:
+            prefetched = []
+        if related is None:
+            related = []
         if not isinstance(resource, Resource):
             try:
-                return Resource.objects.select_related('provider').get(id=resource)
+                return Resource.objects.select_related(*related).prefetch_related(*prefetched).get(id=resource)
             except IntegrityError:
+                logger.warning(f"Resource does not exist. Id: '{resource}'")
                 raise cls.ResourceDoesNotExist()
         else:
             return resource
@@ -89,11 +99,14 @@ class Resources:
     @classmethod
     def set_amount(cls, resource, amount_value, user, save=True):
         resource = cls.get(resource)
+
         resource.amount = amount_value
+        if amount_value < 0:
+            logger.warning(f"resource amount < 0 for resource '{resource.id}'")
 
         action = ResourceAction(
             resource=resource,
-            action_type=ResourceAction.ActionType.SET_AMOUNT.format(amount_value=amount_value),
+            action_type=ResourceAction.ActionType.SET_AMOUNT,
             operator=Operators.get_operator(user),
             value=str(amount_value)
         )
@@ -109,7 +122,8 @@ class Resources:
         resource = cls.get(resource)
 
         resource.amount += delta_amount
-
+        if resource.amount < 0:
+            logger.warning(f"resource amount < 0 for resource '{resource.id}'")
         action = ResourceAction(
             resource=resource,
             action_type=ResourceAction.ActionType.CHANGE_AMOUNT,
@@ -126,6 +140,8 @@ class Resources:
     @classmethod
     def set_cost(cls, resource, cost_value, user, save=True, verified=False):
         resource = cls.get(resource)
+        if cost_value < 0:
+            logger.warning(f"resource cost < 0 for resource '{resource.id}'")
         cost = ResourceCost(
             resource=resource,
             value=cost_value,
@@ -162,12 +178,16 @@ class Resources:
             resource.provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
             value_data.append(f"provider_name={provider_name}")
 
-        ResourceAction.objects.create(
-            resource=resource,
-            action_type=ResourceAction.ActionType.UPDATE_FIELDS,
-            operator=operator,
-            value="|".join(value_data)
-        )
+        if len(value_data) == 0:
+            logger.warning(f"No fields updated for resource with id '{resource.id}'")
+            return cls.detail(resource)
+        else:
+            ResourceAction.objects.create(
+                resource=resource,
+                action_type=ResourceAction.ActionType.UPDATE_FIELDS,
+                operator=operator,
+                value="|".join(value_data)
+            )
 
         return cls.detail(resource)
 
@@ -175,14 +195,13 @@ class Resources:
     def detail(cls, resource):
 
         resource = cls.get(resource)
-        cost = ResourceCost.objects.filter(resource=resource).latest('time_stamp')
+        try:
+            cost = ResourceCost.objects.filter(resource=resource).latest('time_stamp')
+        except ResourceCost.DoesNotExist:
+            logger.warning(f"ResourceCost does not exist for Resource with id '{resource.id}'")
+            cost = ResourceCost.objects.create(resource=resource, value=0)
 
         resource.cost = cost.value
-        resource.cost_time_stamp = cost.time_stamp
-        resource.amount_time_stamp = ResourceAction.objects.filter(
-            action_type__in=[ResourceAction.ActionType.SET_AMOUNT, ResourceAction.ActionType.CHANGE_AMOUNT],
-            resource=resource
-        ).latest('time_stamp').time_stamp
         resource.verified = cost.verified
 
         return resource
@@ -212,6 +231,7 @@ class Resources:
                                                        amount=amount_value)
 
                 except IntegrityError:
+                    logger.warning(f"Not unique external id '{external_id}'")
                     raise cls.UniqueField()
 
                 operator = Operators.get_operator(user)
@@ -222,10 +242,7 @@ class Resources:
                     operator=operator
                 ).save()
 
-                cost, cost_action = cls.set_cost(resource, cost_value, operator, False, True)
-                cost.verified = True
-                cost.save()
-                cost_action.save()
+                cost, cost_action = cls.set_cost(resource, cost_value, operator, True, True)
                 amount, amount_action = cls.set_amount(resource, amount_value, operator)
 
                 resource.cost = cost.value
@@ -234,6 +251,8 @@ class Resources:
                 resource.verified = cost.verified
 
         except DatabaseError as ex:
+            logger.warning(f"Create error resource_name={resource_name}, external_id={external_id}, "
+                           f"cost_value={cost_value}, amount_value={amount_value}, provider_name={provider_name}")
             raise cls.CreateException(ex)
 
         return resource
@@ -248,6 +267,8 @@ class Resources:
                 cls.create(**resource)
             except cls.UniqueField as ex:
                 errors.append(ex)
+                logger.warning(f"Exceptions caught while bulk creating {ex}")
+                continue
         return errors
 
     @classmethod
@@ -325,73 +346,78 @@ class Resources:
 
         errors = []
 
-        with transaction.atomic():
-            operator = Operators.get_operator(user)
-            actions = []
-            costs = []
-            resources = []
-            provider_dict = {}
-            ext = []
-            for x in range(excel.shape[0]):
+        try:
+            with transaction.atomic():
+                operator = Operators.get_operator(user)
+                actions = []
+                costs = []
+                resources = []
+                provider_dict = {}
+                ext = []
+                for x in range(excel.shape[0]):
 
-                row = excel.iloc[x]
+                    row = excel.iloc[x]
 
-                if (not pd.isnull(row['Спецификация / Ресурс'])) and row['Спецификация / Ресурс'].lower() == 'resource':
-                    obj = dict()
+                    if (not pd.isnull(row['Спецификация / Ресурс'])) and \
+                            row['Спецификация / Ресурс'].lower() == 'resource':
+                        obj = dict()
 
-                    obj['name'] = row['Название']
+                        obj['name'] = row['Название']
 
-                    if pd.isnull(row['ID']):
-                        external_id = random_str(24)
+                        if pd.isnull(row['ID']):
+                            external_id = random_str(24)
 
-                    else:
-                        external_id = str(int(row['ID']))
-
-                    if external_id in ext:
-                        continue
-                    else:
-                        ext.append(external_id)
-
-                    obj['external_id'] = external_id
-
-                    if pd.isnull(row['Количество ']):
-                        amount_value = 0
-                    else:
-                        amount_value = row['Количество ']
-
-                    if pd.isnull(row['Поставщик']):
-                        provider = None
-                    else:
-                        provider_name = row['Поставщик']
-                        if provider_name not in provider_dict:
-                            provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
-                            provider_dict[provider_name] = provider
                         else:
-                            provider = provider_dict[provider_name]
+                            external_id = str(int(row['ID']))
 
-                    obj['provider'] = provider
-                    resource = Resource.objects.create(**obj)
+                        if external_id in ext:
+                            continue
+                        else:
+                            ext.append(external_id)
 
-                    if pd.isnull(row['Цена']):
-                        cost_value = 0
-                    else:
-                        cost_value = row['Цена']
+                        obj['external_id'] = external_id
 
-                    cost, cost_action = cls.set_cost(resource, cost_value, operator, verified=True, save=False)
-                    amount, amount_action = cls.set_amount(resource, amount_value, operator, save=False)
-                    create_action = ResourceAction(
-                        resource=resource,
-                        operator=operator,
-                        action_type=ResourceAction.ActionType.CREATE)
+                        if pd.isnull(row['Количество ']):
+                            amount_value = 0
+                        else:
+                            amount_value = row['Количество ']
 
-                    costs.append(cost)
-                    actions.append(cost_action)
-                    actions.append(amount_action)
-                    actions.append(create_action)
-                    resources.append(resource)
-            ResourceCost.objects.bulk_create(costs)
-            ResourceAction.objects.bulk_create(actions)
-            Resource.objects.bulk_update(resources, fields=['amount'])
+                        if pd.isnull(row['Поставщик']):
+                            provider = None
+                        else:
+                            provider_name = row['Поставщик']
+                            if provider_name not in provider_dict:
+                                provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
+                                provider_dict[provider_name] = provider
+                            else:
+                                provider = provider_dict[provider_name]
+
+                        obj['provider'] = provider
+                        resource = Resource.objects.create(**obj)
+
+                        if pd.isnull(row['Цена']):
+                            cost_value = 0
+                        else:
+                            cost_value = row['Цена']
+
+                        cost, cost_action = cls.set_cost(resource, cost_value, operator, verified=True, save=False)
+                        amount, amount_action = cls.set_amount(resource, amount_value, operator, save=False)
+                        create_action = ResourceAction(
+                            resource=resource,
+                            operator=operator,
+                            action_type=ResourceAction.ActionType.CREATE)
+
+                        costs.append(cost)
+                        actions.append(cost_action)
+                        actions.append(amount_action)
+                        actions.append(create_action)
+                        resources.append(resource)
+
+                ResourceCost.objects.bulk_create(costs)
+                ResourceAction.objects.bulk_create(actions)
+                Resource.objects.bulk_update(resources, fields=['amount'])
+        except Exception as ex:
+            logger.warning(f"Error while creating resources from excel")
 
 
 class Specifications:
@@ -423,8 +449,10 @@ class Specifications:
             prefetched = []
         if not isinstance(specification, Specification):
             try:
-                return Specification.objects.select_related('category', *related).prefetch_related(*prefetched).get(id=specification, is_active=True)
+                return Specification.objects.select_related(*related).prefetch_related(*prefetched).get(
+                    id=specification, is_active=True)
             except IntegrityError:
+                logger.warning(f"Specification does not exist. Id: '{specification}'")
                 raise cls.SpecificationDoesNotExist()
         else:
             return specification
@@ -435,6 +463,7 @@ class Specifications:
             try:
                 return SpecificationCategory.objects.get(id=category)
             except IntegrityError:
+                logger.warning(f"Specification does not exist. Id: '{category}'")
                 raise cls.CategoryDoesNotExist()
         else:
             return category
@@ -443,6 +472,8 @@ class Specifications:
     def set_coefficient(cls, specification, coefficient: float, user=None, save=True):
         specification = cls.get(specification)
         specification.coefficient = coefficient
+        if coefficient < 0:
+            logger.warning(f"specification coefficient < 0 for specification '{specification.id}'")
 
         action = SpecificationAction(
             specification=specification,
@@ -461,6 +492,9 @@ class Specifications:
         specification = cls.get(specification)
         specification.price = price
 
+        if price < 0:
+            logger.warning(f"specification price < 0 for specification '{specification.id}'")
+
         action = SpecificationAction(
             specification=specification,
             action_type=SpecificationAction.ActionType.SET_PRICE,
@@ -478,7 +512,8 @@ class Specifications:
     def set_amount(cls, specification, amount: float, user=None, save=True):
         specification = cls.get(specification)
         specification.amount = amount
-
+        if amount < 0:
+            logger.warning(f"specification amount < 0 for specification '{specification.id}'")
         action = SpecificationAction(
             specification=specification,
             action_type=SpecificationAction.ActionType.SET_AMOUNT,
@@ -555,7 +590,7 @@ class Specifications:
         query_res_spec = ResourceSpecification.objects.filter(specification=OuterRef('pk')).values(
             'specification_id').annotate(
             total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')),
-            verified=Min(query_cost.values('verified')[:1]))
+            verified=Min(Cast(query_cost.values('verified')[:1], output_field=IntegerField())))
         specifications = Specification.objects.select_related('category').annotate(
             prime_cost=Subquery(query_res_spec.values('total_cost')),
             verified=Subquery(query_res_spec.values('verified')[:1]),
@@ -621,23 +656,20 @@ class Specifications:
                 actions.append(price_action)
 
                 if resources is not None and len(resources) != 0:
-                    res_specs = []
                     resource_objects = Resource.objects.prefetch_related('resourcecost_set').filter(
                         id__in=map(lambda x: x['id'], resources))
                     res_specs_dict = resource_amounts(resource_objects, resources)
                     for resource in res_specs_dict:
                         res = resource['resource']
                         res.cost = res.resourcecost_set.last().value
-                        res_specs.append(
-                            ResourceSpecification(
-                                resource=res,
-                                amount=resource['amount'],
-                                specification=specification
-                            )
+
+                        ResourceSpecification.objects.create(
+                            resource=res,
+                            amount=resource['amount'],
+                            specification=specification
                         )
 
                         specification.resources = res_specs_dict
-                        ResourceSpecification.objects.bulk_create(res_specs)
 
                 SpecificationAction.objects.create(
                     specification=specification,
@@ -649,6 +681,8 @@ class Specifications:
                 SpecificationAction.objects.bulk_create(actions)
 
         except DatabaseError as ex:
+            logger.warning(f"Create error specification_name={name}, product_id={product_id}, "
+                           f"price={price}, amount={amount}, category_name={category_name}")
             raise cls.CreateException(ex)
 
         return specification
@@ -751,6 +785,7 @@ class Specifications:
                 except ResourceSpecification.DoesNotExist:
                     raise Resources.ResourceDoesNotExist()
         except DatabaseError as ex:
+            logger.error(f"Specification edit error.")
             raise cls.EditException(ex)
 
         return specification
@@ -760,12 +795,13 @@ class Specifications:
         cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
 
         min_amount = None
-
-        for res_spec in specification.res_specs.all():
-            if min_amount is None:
-                min_amount = int(res_spec.resource.amount / res_spec.amount)
-            min_amount = min(min_amount, int(res_spec.resource.amount / res_spec.amount))
-
+        try:
+            for res_spec in specification.res_specs.all():
+                if min_amount is None:
+                    min_amount = int(res_spec.resource.amount / res_spec.amount)
+                    min_amount = min(min_amount, int(res_spec.resource.amount / res_spec.amount))
+        except ZeroDivisionError:
+            logger.warning("Zero division error while finding assemble_info.")
         return min_amount
 
     @classmethod
@@ -779,48 +815,52 @@ class Specifications:
 
     @classmethod
     def build_set(cls, specification, amount, from_resources=False, user=None):
-        with transaction.atomic():
-            if not isinstance(specification, Specification):
-                if from_resources:
-                    specification = Specification.objects.prefetch_related(
-                        'res_specs',
-                        'res_specs__resource'
-                    ).get(id=specification)
-                else:
-                    specification = Specification.objects.get(id=specification)
-
-            resources = []
-            actions = []
-
-            operator = Operators.get_operator(user)
-            if from_resources:
-                for res_spec in specification.res_specs.all():
-                    resource = res_spec.resource
-
-                    if resource.amount < res_spec.amount * amount:
-                        raise cls.CantBuildSet()
-
+        try:
+            with transaction.atomic():
+                if not isinstance(specification, Specification):
+                    if from_resources:
+                        specification = Specification.objects.prefetch_related(
+                            'res_specs',
+                            'res_specs__resource'
+                        ).get(id=specification)
                     else:
-                        _, action = Resources.change_amount(resource, -res_spec.amount * amount, operator,
-                                                            False)
-                        resources.append(resource)
-                        actions.append(action)
+                        specification = Specification.objects.get(id=specification)
 
-                Resource.objects.bulk_update(resources, fields=['amount'])
-                ResourceAction.objects.bulk_create(actions)
+                resources = []
+                actions = []
 
-                value = 'from_resources=True'
-            else:
-                value = 'from_resources=False'
+                operator = Operators.get_operator(user)
+                if from_resources:
+                    for res_spec in specification.res_specs.all():
+                        resource = res_spec.resource
 
-            SpecificationAction.objects.create(
-                specification=specification,
-                action_type=SpecificationAction.ActionType.BUILD_SET,
-                value=value,
-                operator=Operators.get_operator(user)
-            )
-            specification.amount += amount
-            specification.save()
+                        if resource.amount < res_spec.amount * amount:
+                            raise cls.CantBuildSet()
+
+                        else:
+                            _, action = Resources.change_amount(resource, -res_spec.amount * amount, operator,
+                                                                False)
+                            resources.append(resource)
+                            actions.append(action)
+
+                    Resource.objects.bulk_update(resources, fields=['amount'])
+                    ResourceAction.objects.bulk_create(actions)
+
+                    value = 'from_resources=True'
+                else:
+                    value = 'from_resources=False'
+
+                SpecificationAction.objects.create(
+                    specification=specification,
+                    action_type=SpecificationAction.ActionType.BUILD_SET,
+                    value=value,
+                    operator=Operators.get_operator(user)
+                )
+                specification.amount += amount
+                specification.save()
+        except DatabaseError as ex:
+            logger.error(f"Error while building set.")
+            raise ex
 
 
 class Orders:

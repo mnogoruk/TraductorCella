@@ -108,12 +108,12 @@ class ResourceSetCostView(APIView):
         try:
             r_id = data['id']
         except KeyError as ex:
-            logger.warning(f"'{'id'}' not specified")
+            logger.warning(f"'id' not specified")
             raise NoParameterSpecified('id')
         try:
             value = data['cost']
         except KeyError as ex:
-            logger.warning(f"'{'cost'}' not specified")
+            logger.warning(f"'cost' not specified")
             raise NoParameterSpecified('cost')
         if value is not None:
 
@@ -130,12 +130,12 @@ class ResourceAddAmountView(APIView):
         try:
             r_id = data['id']
         except KeyError as ex:
-            logger.warning(f"'{'id'}' not specified")
+            logger.warning(f"'id' not specified")
             raise NoParameterSpecified('id')
         try:
-            logger.warning(f"'{'amount'}' not specified")
             delta_amount = data['amount']
         except KeyError as ex:
+            logger.warning(f"'amount' not specified")
             raise NoParameterSpecified('amount')
         amount, _ = Resources.change_amount(r_id, delta_amount, user=request.user)
         return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
@@ -148,14 +148,14 @@ class ResourceVerifyCostView(APIView):
         try:
             ids = data['ids']
         except KeyError as ex:
+            logger.warning(f"'id' not specified")
             raise NoParameterSpecified('ids')
         if not isinstance(ids, list):
+            logger.warning(f"'ids' has wrong type. Type: {type(ids)}")
             raise ParameterExceptions(detail="'ids' must be list object.")
         if ids is not None:
             Resources.verify_cost(ids, request.user)
             return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
-        else:
-            raise NoParameterSpecified()
 
 
 class ProviderListView(ListAPIView):
@@ -183,8 +183,10 @@ class ResourceBulkDeleteView(APIView):
         try:
             ids = data['ids']
         except KeyError as ex:
+            logger.warning(f"'id' not specified")
             raise NoParameterSpecified('ids')
         if not isinstance(ids, list):
+            logger.warning(f"'ids' has wrong type. Type: {type(ids)}")
             raise ParameterExceptions(detail="'ids' must be list object.")
         Resources.bulk_delete(ids, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
@@ -206,6 +208,7 @@ class SpecificationDetailView(RetrieveAPIView):
         try:
             specification = Specifications.detail(s_id)
         except Specification.DoesNotExist:
+            logger.warning(f"'id' not specified")
             raise Http404()
         self.check_object_permissions(request=self.request, obj=specification)
 
@@ -237,7 +240,13 @@ class SpecificationEditView(RetrieveUpdateAPIView):
         return serializer.save(user=self.request.user)
 
     def get_object(self):
-        return Specification.objects.get(id=self.kwargs['s_id'])
+        s_id = self.kwargs['s_id']
+        try:
+            resource = Resources.get(s_id)
+        except Resource.DoesNotExist:
+            logger.warning(f"Can`t get object 'Specification' with id: {s_id}.")
+            raise Http404()
+        self.check_object_permissions(request=self.request, obj=resource)
 
 
 class SpecificationSetPriceView(APIView):
@@ -247,12 +256,13 @@ class SpecificationSetPriceView(APIView):
         try:
             s_id = data['id']
         except KeyError as ex:
+            logger.warning(f"'id' not specified")
             raise NoParameterSpecified('id')
         try:
             value = data['price']
         except KeyError as ex:
+            logger.warning(f"'price' not specified")
             raise NoParameterSpecified('price')
-
         if value is not None and s_id is not None:
             Specifications.set_price(specification=s_id, price=value, user=request.user)
             return Response(data={'id': s_id, 'price': value}, status=status.HTTP_202_ACCEPTED)
@@ -267,8 +277,10 @@ class SpecificationSetCoefficientView(APIView):
         try:
             s_id = data['id']
         except KeyError as ex:
+            logger.warning(f"'id' not specified")
             raise NoParameterSpecified('id')
         try:
+            logger.warning(f"'coefficient' not specified")
             value = data['coefficient']
         except KeyError as ex:
             raise NoParameterSpecified('coefficient')
@@ -283,16 +295,23 @@ class SpecificationSetCategoryView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
+
         try:
             ids = data['ids']
         except KeyError as ex:
+            logger.warning(f"'ids' not specified")
             raise NoParameterSpecified('ids')
+
         if not isinstance(ids, list):
+            logger.warning(f"'ids' has wrong type. Type: {type(ids)}")
             raise ParameterExceptions(detail="'ids' must be list object.")
+
         try:
             category = data['category']
         except KeyError as ex:
+            logger.warning(f"'category' not specified")
             raise NoParameterSpecified('category')
+
         Specifications.set_category_many(ids, category, request.user)
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
@@ -301,7 +320,11 @@ class SpecificationAssembleInfoView(APIView):
 
     def get(self, request, *args, **kwargs):
         s_id = self.kwargs['s_id']
-        assembling_amount = Specifications.assemble_info(s_id)
+        try:
+            assembling_amount = Specifications.assemble_info(s_id)
+        except Specifications.SpecificationDoesNotExist:
+            logger.warning(f"Can`t get object 'Specification' with id: {s_id}.")
+            raise Http404
 
         return Response(data={'assembling_amount': assembling_amount}, status=status.HTTP_200_OK)
 
