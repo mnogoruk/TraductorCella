@@ -9,10 +9,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from cella.serializer import FileSerializer
+from cella.service import Operators
 from resources.models import Resource
 from resources.serializer import ResourceSerializer, ResourceWithUnverifiedCostSerializer, ResourceActionSerializer, \
     ResourceShortSerializer, ResourceProviderSerializer
-from resources.service import Resources
+from resources.service import Resources, create_from_excel
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError
 from utils.pagination import StandardResultsSetPagination
@@ -207,15 +208,26 @@ class ProviderListView(ListAPIView):
 class ResourceExelUploadView(CreateAPIView):
     serializer_class = FileSerializer
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.instance = None
+
     def post(self, request, *args, **kwargs):
         try:
-            file = request.FILES['file']
-            Resources.create_from_excel(file, request.user)
+            response = super().post(request, *args, **kwargs)
+            instance = self.get_instance()
+            operator = Operators.get_operator(request.user)
+            create_from_excel(file_instance_id=instance.id, operator_id=operator.id)
         except Exception as e:
-            logger.warning("File error | ResourceExelUploadView")
+            logger.warning("File error | ResourceExelUploadView", exc_info=True)
             raise FileException()
-        return super().post(request, *args, **kwargs)
+        return response
 
+    def perform_create(self, serializer):
+        self.instance = serializer.save()
+
+    def get_instance(self):
+        return self.instance
 
 class ResourceBulkDeleteView(APIView):
 

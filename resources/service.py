@@ -1,9 +1,13 @@
+import threading
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
 from django.db.models import OuterRef, Subquery, Exists
+from background_task import background
 
+from cella.models import File
 from cella.service import Operators
 from utils.function import random_str
 
@@ -298,78 +302,83 @@ class Resources:
     def bulk_delete(cls, ids, user):
         Resource.objects.filter(id__in=ids).delete()
 
-    @classmethod
-    def create_from_excel(cls, file, user=None):
-        excel = pd.read_excel(file)
 
-        errors = []
-        try:
-            with transaction.atomic():
-                operator = Operators.get_operator(user)
-                actions = []
-                costs = []
-                resources = []
-                provider_dict = {}
-                ext = []
-                for x in range(excel.shape[0]):
+@background(schedule=0)
+def create_from_excel(file_instance_id, operator_id=None):
+    try:
+        file = File.objects.get(id=file_instance_id)
+        excel = pd.read_excel(file.file)
+    except Exception:
+        logger.warning(f"Error while reading excel file {file_instance_id}", exc_info=True)
+        raise
+    errors = []
+    try:
+        with transaction.atomic():
+            operator = Operators.get_operator(operator_id)
+            actions = []
+            costs = []
+            resources = []
+            provider_dict = {}
+            ext = []
+            for x in range(excel.shape[0]):
 
-                    row = excel.iloc[x]
-                    if (not pd.isnull(row['Спецификация / Ресурс'])) and \
-                            row['Спецификация / Ресурс'].lower() == 'resource':
-                        obj = dict()
-                        obj['name'] = row['Название']
+                row = excel.iloc[x]
+                if (not pd.isnull(row['Спецификация / Ресурс'])) and \
+                        row['Спецификация / Ресурс'].lower() == 'resource':
+                    obj = dict()
+                    obj['name'] = row['Название']
 
-                        if pd.isnull(row['ID']):
-                            external_id = random_str(24)
+                    if pd.isnull(row['ID']):
+                        external_id = random_str(24)
 
+                    else:
+                        external_id = str(int(row['ID']))
+
+                    if external_id in ext:
+                        continue
+                    else:
+                        ext.append(external_id)
+
+                    obj['external_id'] = external_id
+
+                    if pd.isnull(row['Количество ']):
+                        amount_value = 0
+                    else:
+                        amount_value = row['Количество ']
+
+                    if pd.isnull(row['Поставщик']):
+                        provider = None
+                    else:
+                        provider_name = row['Поставщик']
+                        if provider_name not in provider_dict:
+                            provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
+                            provider_dict[provider_name] = provider
                         else:
-                            external_id = str(int(row['ID']))
+                            provider = provider_dict[provider_name]
 
-                        if external_id in ext:
-                            continue
-                        else:
-                            ext.append(external_id)
+                    obj['provider'] = provider
+                    resource = Resource.objects.create(**obj)
+                    if pd.isnull(row['Цена']):
+                        cost_value = 0
+                    else:
+                        cost_value = row['Цена']
 
-                        obj['external_id'] = external_id
+                    cost, cost_action = Resources.set_cost(resource, cost_value, operator, verified=True, save=False)
+                    amount, amount_action = Resources.set_amount(resource, amount_value, operator, save=False)
+                    create_action = ResourceAction(
+                        resource=resource,
+                        operator=operator,
+                        action_type=ResourceAction.ActionType.CREATE)
 
-                        if pd.isnull(row['Количество ']):
-                            amount_value = 0
-                        else:
-                            amount_value = row['Количество ']
+                    costs.append(cost)
+                    actions.append(cost_action)
+                    actions.append(amount_action)
+                    actions.append(create_action)
+                    resources.append(resource)
 
-                        if pd.isnull(row['Поставщик']):
-                            provider = None
-                        else:
-                            provider_name = row['Поставщик']
-                            if provider_name not in provider_dict:
-                                provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
-                                provider_dict[provider_name] = provider
-                            else:
-                                provider = provider_dict[provider_name]
-
-                        obj['provider'] = provider
-                        resource = Resource.objects.create(**obj)
-                        if pd.isnull(row['Цена']):
-                            cost_value = 0
-                        else:
-                            cost_value = row['Цена']
-
-                        cost, cost_action = cls.set_cost(resource, cost_value, operator, verified=True, save=False)
-                        amount, amount_action = cls.set_amount(resource, amount_value, operator, save=False)
-                        create_action = ResourceAction(
-                            resource=resource,
-                            operator=operator,
-                            action_type=ResourceAction.ActionType.CREATE)
-
-                        costs.append(cost)
-                        actions.append(cost_action)
-                        actions.append(amount_action)
-                        actions.append(create_action)
-                        resources.append(resource)
-
-                ResourceCost.objects.bulk_create(costs)
-                ResourceAction.objects.bulk_create(actions)
-                Resource.objects.bulk_update(resources, fields=['amount'])
-        except Exception as ex:
-            logger.warning(f"Error while creating resources from excel")
-            raise cls.CreateError()
+            ResourceCost.objects.bulk_create(costs)
+            ResourceAction.objects.bulk_create(actions)
+            Resource.objects.bulk_update(resources, fields=['amount'])
+    except Exception as ex:
+        logger.warning(f"Error while creating resources from excel", exc_info=True)
+        raise Resources.CreateError()

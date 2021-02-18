@@ -12,10 +12,11 @@ class Operators:
 
         if isinstance(user, Operator):
             return user
-        if user is None:
-            operator = Operator.get_system_operator()
+        elif isinstance(user, int):
+            return Operator.objects.get(id=user)
+        elif user is None:
+            return Operator.get_system_operator()
         elif user.is_anonymous:
-            operator = Operator.get_anonymous_operator()
+            return Operator.get_anonymous_operator()
         else:
-            operator = Operator.get_user_operator(user)
-        return operator
+            return Operator.get_user_operator(user)

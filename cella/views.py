@@ -4,13 +4,14 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from rest_framework.authentication import BasicAuthentication
 from cella.models import Test1, Test2
 
 logger = logging.getLogger(__name__)
 
 
 class TestView(APIView):
+    authentication_classes = (BasicAuthentication,)
 
     def get(self, request, *args, **kwargs):
         with transaction.atomic():
