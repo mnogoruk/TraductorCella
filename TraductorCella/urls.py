@@ -21,6 +21,9 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('cella.urls')),
+    path('resource/', include('resources.urls')),
+    path('specification/', include('specification.urls')),
+    path('order/', include('order.urls')),
     path('__debug__/', include(debug_toolbar.urls)),
     path('silk/', include('silk.urls'))
 ]

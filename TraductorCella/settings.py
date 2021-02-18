@@ -35,8 +35,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
+    'resources',
+    'specification',
+    'order',
     'cella',
+    'rest_framework',
     'debug_toolbar',
     'silk',
     'django_filters',
@@ -89,7 +92,7 @@ WSGI_APPLICATION = 'TraductorCella.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'postgres',
+        'NAME': 'smola20',
         'USER': 'postgres',
         'PASSWORD': '1',
         'HOST': 'localhost',
@@ -135,6 +138,10 @@ STATIC_URL = '/static/'
 
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
+
+REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'utils.exception_handler.custom_exception_handler'
+}
 
 LOGGING = {
     'version': 1,

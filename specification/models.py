@@ -1,7 +1,7 @@
 from django.db import models
 
 from cella.models import Operator
-from resource.models import Resource
+from resources.models import Resource
 
 
 class SpecificationCategory(models.Model):

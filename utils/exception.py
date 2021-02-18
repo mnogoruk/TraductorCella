@@ -51,3 +51,39 @@ class CreateException(APIException):
     status_code = 500
     default_detail = 'Can`t create object'
     default_code = 'internal_error'
+
+
+class FileException(APIException):
+    status_code = 400
+    default_detail = 'Fail error'
+    default_code = 'bad_request'
+
+
+class CreationError(APIException):
+    status_code = 400
+    default_detail = 'Unexpected error while editing object'
+    default_code = 'bad_request'
+
+
+class UpdateError(APIException):
+    status_code = 400
+    default_detail = 'Unexpected error while updating object'
+    default_code = 'bad_request'
+
+
+class DoesNotExist(APIException):
+    status_code = 500
+    default_detail = 'Object or query does not exist'
+    default_code = 'internal_error'
+
+
+class QueryError(APIException):
+    status_code = 500
+    default_code = 'internal_error'
+    default_detail = 'Can`t manage query'
+
+
+class AssembleError(APIException):
+    status_code = 400
+    default_code = 'bad_request'
+    default_detail = 'Assembling error'
