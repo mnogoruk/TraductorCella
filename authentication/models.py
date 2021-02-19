@@ -65,9 +65,17 @@ class UserManager(BaseUserManager):
 
 class Account(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=20, unique=True)
-    date_create = models.DateTimeField('Дата создания')
+    date_create = models.DateTimeField('Дата создания', auto_now_add=True)
     is_banned = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
+
+    class RoleChoice(models.IntegerChoices):
+        ADMIN = 40, 'Admin'
+        STORAGE_WORKER = 30, 'Storage_worker'
+        OFFICE_WORKER = 20, 'Office worker'
+        OTHER = 10, 'Other'
+
+    role = models.IntegerField(max_length=3, choices=RoleChoice.choices, default=RoleChoice.OTHER)
 
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = []

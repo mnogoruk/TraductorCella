@@ -18,7 +18,7 @@ from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError
 from utils.pagination import StandardResultsSetPagination
-
+from authentication.permissions import OfficeWorkerPermission
 logger = getLogger(__name__)
 
 
@@ -83,6 +83,7 @@ class ResourceWithUnverifiedCostsView(ListAPIView):
 
 class ResourceListView(ListAPIView):
     serializer_class = ResourceSerializer
+    permission_classes = [OfficeWorkerPermission,]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name', 'id', 'provider__name']
