@@ -10,6 +10,7 @@ django-debug-toolbar==3.2
 django-filter==2.4.0
 django-heroku==0.3.1
 django-silk==4.1.0
+httptools==0.1.1
 djangorestframework==3.12.2
 et-xmlfile==1.0.1
 gprof2dot==2019.11.30
