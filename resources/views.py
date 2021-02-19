@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync, sync_to_async
 from django.http import Http404
 from rest_framework import status
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -13,7 +14,7 @@ from cella.service import Operators
 from resources.models import Resource
 from resources.serializer import ResourceSerializer, ResourceWithUnverifiedCostSerializer, ResourceActionSerializer, \
     ResourceShortSerializer, ResourceProviderSerializer
-from resources.service import Resources, create_from_excel
+from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError
 from utils.pagination import StandardResultsSetPagination
@@ -213,11 +214,13 @@ class ResourceExelUploadView(CreateAPIView):
         self.instance = None
 
     def post(self, request, *args, **kwargs):
+
+        response = super(ResourceExelUploadView, self).post(request, *args, **kwargs)
+        instance = self.get_instance()
         try:
-            response = super().post(request, *args, **kwargs)
-            instance = self.get_instance()
             operator = Operators.get_operator(request.user)
-            create_from_excel(file_instance_id=instance.id, operator_id=operator.id)
+            creation = async_to_sync(Resources.create_from_excel)
+            creation(file_instance_id=instance.id, operator_id=operator.id)
         except Exception as e:
             logger.warning("File error | ResourceExelUploadView", exc_info=True)
             raise FileException()
@@ -228,6 +231,7 @@ class ResourceExelUploadView(CreateAPIView):
 
     def get_instance(self):
         return self.instance
+
 
 class ResourceBulkDeleteView(APIView):
 

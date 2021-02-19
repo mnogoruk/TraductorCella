@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'resources',
     'specification',
     'background_task',
+    'authentication',
     'order',
     'cella',
     'rest_framework',
@@ -135,6 +136,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
+AUTH_USER_MODEL = 'authentication.Account'
+
 STATIC_URL = '/static/'
 
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -143,7 +146,7 @@ MEDIA_URL = '/media/'
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'utils.exception_handler.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
-    # 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated']
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated']
 }
 
 SIMPLE_JWT = {

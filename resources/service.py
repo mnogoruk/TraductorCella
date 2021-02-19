@@ -1,5 +1,8 @@
+import asyncio
 import threading
+import time
 
+from asgiref.sync import sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
@@ -302,83 +305,86 @@ class Resources:
     def bulk_delete(cls, ids, user):
         Resource.objects.filter(id__in=ids).delete()
 
+    @classmethod
+    async def create_from_excel(cls, file_instance_id, operator_id):
+        asyncio.create_task(create_from_excel(file_instance_id, operator_id))
+        return
 
-@background(schedule=0)
-def create_from_excel(file_instance_id, operator_id=None):
+
+async def create_from_excel(file_instance_id, operator_id=None):
     try:
-        file = File.objects.get(id=file_instance_id)
+        file = await sync_to_async(File.objects.get)(id=file_instance_id)
         excel = pd.read_excel(file.file)
     except Exception:
         logger.warning(f"Error while reading excel file {file_instance_id}", exc_info=True)
         raise
-    errors = []
     try:
-        with transaction.atomic():
-            operator = Operators.get_operator(operator_id)
-            actions = []
-            costs = []
-            resources = []
-            provider_dict = {}
-            ext = []
-            for x in range(excel.shape[0]):
+        operator = await (sync_to_async(Operators.get_operator)(operator_id))
+        actions = []
+        costs = []
+        provider_dict = {}
+        ext = []
+        resources = []
+        for x in range(excel.shape[0]):
 
-                row = excel.iloc[x]
-                if (not pd.isnull(row['Спецификация / Ресурс'])) and \
-                        row['Спецификация / Ресурс'].lower() == 'resource':
-                    obj = dict()
-                    obj['name'] = row['Название']
+            row = excel.iloc[x]
+            if (not pd.isnull(row['Спецификация / Ресурс'])) and \
+                    row['Спецификация / Ресурс'].lower() == 'resource':
+                obj = dict()
+                obj['name'] = row['Название']
 
-                    if pd.isnull(row['ID']):
-                        external_id = random_str(24)
+                if pd.isnull(row['ID']):
+                    external_id = random_str(24)
 
+                else:
+                    external_id = str(int(row['ID']))
+
+                if external_id in ext:
+                    continue
+                else:
+                    ext.append(external_id)
+
+                obj['external_id'] = external_id
+
+                if pd.isnull(row['Количество ']):
+                    amount_value = 0
+                else:
+                    amount_value = row['Количество ']
+
+                if pd.isnull(row['Поставщик']):
+                    provider = None
+                else:
+                    provider_name = row['Поставщик']
+                    if provider_name not in provider_dict:
+                        provider = (await (sync_to_async(ResourceProvider.objects.get_or_create)(name=provider_name)))[
+                            0]
+                        provider_dict[provider_name] = provider
                     else:
-                        external_id = str(int(row['ID']))
+                        provider = provider_dict[provider_name]
 
-                    if external_id in ext:
-                        continue
-                    else:
-                        ext.append(external_id)
+                obj['provider'] = provider
+                resource = await (sync_to_async(Resource.objects.create)(**obj))
+                if pd.isnull(row['Цена']):
+                    cost_value = 0
+                else:
+                    cost_value = row['Цена']
+                cost, cost_action = Resources.set_cost(resource, cost_value, operator, verified=True, save=False)
+                amount, amount_action = Resources.set_amount(resource, amount_value, operator, save=False)
+                create_action = ResourceAction(
+                    resource=resource,
+                    operator=operator,
+                    action_type=ResourceAction.ActionType.CREATE)
 
-                    obj['external_id'] = external_id
+                costs.append(cost)
+                actions.append(cost_action)
+                actions.append(amount_action)
+                actions.append(create_action)
+                resources.append(resource)
 
-                    if pd.isnull(row['Количество ']):
-                        amount_value = 0
-                    else:
-                        amount_value = row['Количество ']
-
-                    if pd.isnull(row['Поставщик']):
-                        provider = None
-                    else:
-                        provider_name = row['Поставщик']
-                        if provider_name not in provider_dict:
-                            provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
-                            provider_dict[provider_name] = provider
-                        else:
-                            provider = provider_dict[provider_name]
-
-                    obj['provider'] = provider
-                    resource = Resource.objects.create(**obj)
-                    if pd.isnull(row['Цена']):
-                        cost_value = 0
-                    else:
-                        cost_value = row['Цена']
-
-                    cost, cost_action = Resources.set_cost(resource, cost_value, operator, verified=True, save=False)
-                    amount, amount_action = Resources.set_amount(resource, amount_value, operator, save=False)
-                    create_action = ResourceAction(
-                        resource=resource,
-                        operator=operator,
-                        action_type=ResourceAction.ActionType.CREATE)
-
-                    costs.append(cost)
-                    actions.append(cost_action)
-                    actions.append(amount_action)
-                    actions.append(create_action)
-                    resources.append(resource)
-
-            ResourceCost.objects.bulk_create(costs)
-            ResourceAction.objects.bulk_create(actions)
-            Resource.objects.bulk_update(resources, fields=['amount'])
+        group = asyncio.gather((sync_to_async(ResourceCost.objects.bulk_create)(costs)),
+                               (sync_to_async(ResourceAction.objects.bulk_create)(actions)),
+                               (sync_to_async(Resource.objects.bulk_update)(resources, fields=['amount'])))
+        await group
     except Exception as ex:
         logger.warning(f"Error while creating resources from excel", exc_info=True)
         raise Resources.CreateError()
