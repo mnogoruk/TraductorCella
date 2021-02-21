@@ -22,6 +22,12 @@ class SpecificationResourceSerializer(serializers.Serializer):
         pass
 
 
+class SpecificationShortSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Specification
+        fields = ['name', 'product_id', 'id', 'price']
+
+
 class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=8, decimal_places=2)
     id = serializers.IntegerField()
@@ -112,4 +118,3 @@ class SpecificationEditSerializer(serializers.ModelSerializer):
     class Meta:
         model = Specification
         fields = '__all__'
-

@@ -1,30 +1,38 @@
 from rest_framework import permissions
-from .models import Account
+from .models import RoleChoice
 
 
 class OfficeWorkerPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
         user = request.user
-        return user.role >= Account.RoleChoice.OFFICE_WORKER and super(OfficeWorkerPermission, self).has_permission(request, view)
+        return user.role >= RoleChoice.OFFICE_WORKER
 
 
 class StorageWorkerPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
         user = request.user
-        return user.role >= Account.RoleChoice.STORAGE_WORKER and super(StorageWorkerPermission, self).has_permission(request, view)
+        return user.role >= RoleChoice.STORAGE_WORKER
 
 
 class AdminPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
         user = request.user
-        return user.role >= Account.RoleChoice.ADMIN and super(AdminPermission, self).has_permission(request, view)
+        return user.role >= RoleChoice.ADMIN
 
 
 class DefaultPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
         user = request.user
-        return user.role >= Account.RoleChoice.OTHER and super(DefaultPermission, self).has_permission(request, view)
+        return user.role >= RoleChoice.DEFAULT

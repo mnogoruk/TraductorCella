@@ -5,21 +5,24 @@ from logging import getLogger
 
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from rest_framework.permissions import IsAuthenticated
 from resources.models import Resource
 from resources.service import Resources
 from specification.models import Specification
 from specification.serializer import SpecificationCategorySerializer, SpecificationDetailSerializer, \
-    SpecificationListSerializer, SpecificationEditSerializer
+    SpecificationListSerializer, SpecificationEditSerializer, SpecificationShortSerializer
 from specification.service import Specifications
 from utils.exception import NoParameterSpecified, ParameterExceptions, QueryError, UpdateError, AssembleError
 from utils.pagination import StandardResultsSetPagination
+from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission, \
+    AdminPermission
 
 logger = getLogger(__name__)
 
 
 class SpecificationCategoryListView(ListAPIView):
     serializer_class = SpecificationCategorySerializer
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -30,6 +33,7 @@ class SpecificationCategoryListView(ListAPIView):
 
 class SpecificationDetailView(RetrieveAPIView):
     serializer_class = SpecificationDetailSerializer
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_object(self):
         s_id = self.kwargs['s_id']
@@ -46,6 +50,7 @@ class SpecificationDetailView(RetrieveAPIView):
 class SpecificationListView(ListAPIView):
     serializer_class = SpecificationListSerializer
     pagination_class = StandardResultsSetPagination
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -57,6 +62,7 @@ class SpecificationListView(ListAPIView):
 
 class SpecificationCreateView(CreateAPIView):
     serializer_class = SpecificationDetailSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         try:
@@ -71,6 +77,7 @@ class SpecificationCreateView(CreateAPIView):
 
 class SpecificationEditView(RetrieveUpdateAPIView):
     serializer_class = SpecificationEditSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def perform_update(self, serializer):
         try:
@@ -91,6 +98,7 @@ class SpecificationEditView(RetrieveUpdateAPIView):
 
 
 class SpecificationSetPriceView(APIView):
+    permission_classes = [IsAuthenticated, AdminPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -115,6 +123,7 @@ class SpecificationSetPriceView(APIView):
 
 
 class SpecificationSetCoefficientView(APIView):
+    permission_classes = [IsAuthenticated, AdminPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -140,6 +149,7 @@ class SpecificationSetCoefficientView(APIView):
 
 
 class SpecificationSetCategoryView(APIView):
+    permission_classes = [IsAuthenticated, AdminPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -165,6 +175,7 @@ class SpecificationSetCategoryView(APIView):
 
 
 class SpecificationAssembleInfoView(APIView):
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         s_id = self.kwargs['s_id']
@@ -179,6 +190,7 @@ class SpecificationAssembleInfoView(APIView):
 
 
 class SpecificationBuildSetView(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -203,6 +215,7 @@ class SpecificationBuildSetView(APIView):
 
 
 class SpecificationBulkDeleteView(APIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -220,4 +233,12 @@ class SpecificationBulkDeleteView(APIView):
 
 
 class SpecificationCreateCategoryView(CreateAPIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+
     serializer_class = SpecificationCategorySerializer
+
+
+class SpecificationListShortView(ListAPIView):
+    serializer_class = SpecificationShortSerializer
+    def get_queryset(self):
+        return Specifications.shortlist()

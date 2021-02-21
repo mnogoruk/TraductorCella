@@ -5,17 +5,19 @@ from rest_framework import status
 from rest_framework.generics import RetrieveAPIView, ListAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from rest_framework.permissions import IsAuthenticated
 from order.serializer import OrderSerializer
 from order.service import Orders
 from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType
 from utils.pagination import StandardResultsSetPagination
+from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 
 logger = logging.getLogger(__name__)
 
 
 class OrderDetailView(RetrieveAPIView):
     serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_object(self):
         o_id = self.kwargs.get('o_id')
@@ -32,6 +34,7 @@ class OrderDetailView(RetrieveAPIView):
 class OrderListView(ListAPIView):
     serializer_class = OrderSerializer
     pagination_class = StandardResultsSetPagination
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -41,6 +44,7 @@ class OrderListView(ListAPIView):
 
 
 class OrderAssembleSpecificationView(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -67,6 +71,7 @@ class OrderAssembleSpecificationView(APIView):
 
 
 class OrderDisAssembleSpecificationView(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -89,6 +94,7 @@ class OrderDisAssembleSpecificationView(APIView):
 
 
 class OrderManageActionView(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -118,6 +124,7 @@ class OrderManageActionView(APIView):
 
 
 class OrderAssemblingInfoView(APIView):
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         o_id = self.kwargs.get('o_id')
@@ -128,6 +135,7 @@ class OrderAssemblingInfoView(APIView):
 
 
 class OrderBulkDeleteView(APIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -143,6 +151,7 @@ class OrderBulkDeleteView(APIView):
 
 class OrderCreateView(CreateAPIView):
     serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)

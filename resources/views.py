@@ -18,12 +18,16 @@ from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError
 from utils.pagination import StandardResultsSetPagination
-from authentication.permissions import OfficeWorkerPermission
+from authentication.permissions import OfficeWorkerPermission, AdminPermission, StorageWorkerPermission, \
+    DefaultPermission
+from rest_framework.permissions import IsAuthenticated
+
 logger = getLogger(__name__)
 
 
 class ResourceDetailView(RetrieveAPIView):
     serializer_class = ResourceSerializer
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_object(self):
         r_id = self.kwargs['r_id']
@@ -39,6 +43,7 @@ class ResourceDetailView(RetrieveAPIView):
 
 class ResourceCreateView(CreateAPIView):
     serializer_class = ResourceSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         try:
@@ -50,6 +55,7 @@ class ResourceCreateView(CreateAPIView):
 
 class ResourceUpdateView(UpdateAPIView):
     serializer_class = ResourceSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def perform_update(self, serializer):
         try:
@@ -72,6 +78,7 @@ class ResourceUpdateView(UpdateAPIView):
 
 class ResourceWithUnverifiedCostsView(ListAPIView):
     serializer_class = ResourceWithUnverifiedCostSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def get_queryset(self):
         try:
@@ -82,8 +89,9 @@ class ResourceWithUnverifiedCostsView(ListAPIView):
 
 
 class ResourceListView(ListAPIView):
+    IsAuthenticated = [DefaultPermission]
     serializer_class = ResourceSerializer
-    permission_classes = [OfficeWorkerPermission,]
+    permission_classes = [OfficeWorkerPermission, ]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name', 'id', 'provider__name']
@@ -107,6 +115,7 @@ class ResourceListView(ListAPIView):
 
 class ResourceActionsView(ListAPIView):
     serializer_class = ResourceActionSerializer
+    permission_classes = [IsAuthenticated, AdminPermission]
 
     def get_queryset(self):
         try:
@@ -118,6 +127,7 @@ class ResourceActionsView(ListAPIView):
 
 class ResourceShortListView(ListAPIView):
     serializer_class = ResourceShortSerializer
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -128,6 +138,7 @@ class ResourceShortListView(ListAPIView):
 
 
 class ResourceSetCostView(APIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -153,6 +164,7 @@ class ResourceSetCostView(APIView):
 
 
 class ResourceAddAmountView(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -175,6 +187,7 @@ class ResourceAddAmountView(APIView):
 
 
 class ResourceVerifyCostView(APIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -197,6 +210,7 @@ class ResourceVerifyCostView(APIView):
 
 class ProviderListView(ListAPIView):
     serializer_class = ResourceProviderSerializer
+    permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -209,6 +223,7 @@ class ProviderListView(ListAPIView):
 # TODO: ...
 class ResourceExelUploadView(CreateAPIView):
     serializer_class = FileSerializer
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -235,6 +250,7 @@ class ResourceExelUploadView(CreateAPIView):
 
 
 class ResourceBulkDeleteView(APIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data

@@ -1,10 +1,18 @@
+import uuid
+
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin, User
 from django.contrib import auth
 from django.db import models
 
 
-# Create your models here.
+class RoleChoice(models.IntegerChoices):
+    ADMIN = 40, 'Admin'
+    OFFICE_WORKER = 30, 'Office worker'
+    STORAGE_WORKER = 20, 'Storage_worker'
+    DEFAULT = 10, 'Default'
+
+
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
@@ -23,12 +31,14 @@ class UserManager(BaseUserManager):
     def create_user(self, username, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
+        extra_fields.setdefault('is_active', True)
         return self._create_user(username, password, **extra_fields)
 
     def create_superuser(self, username, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-
+        extra_fields.setdefault('role', RoleChoice.ADMIN)
+        extra_fields.setdefault('verified', True)
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
@@ -64,18 +74,16 @@ class UserManager(BaseUserManager):
 
 
 class Account(AbstractBaseUser, PermissionsMixin):
-    username = models.CharField(max_length=20, unique=True)
-    date_create = models.DateTimeField('Дата создания', auto_now_add=True)
+    username = models.CharField(max_length=100, unique=True)
+
+    first_name = models.CharField(max_length=100, null=True)
+    last_name = models.CharField(max_length=100, null=True)
     is_banned = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
-
-    class RoleChoice(models.IntegerChoices):
-        ADMIN = 40, 'Admin'
-        STORAGE_WORKER = 30, 'Storage_worker'
-        OFFICE_WORKER = 20, 'Office worker'
-        OTHER = 10, 'Other'
-
-    role = models.IntegerField(max_length=3, choices=RoleChoice.choices, default=RoleChoice.OTHER)
+    email = models.EmailField(max_length=200, null=True)
+    verified = models.BooleanField(default=False)
+    verifying_slug = models.SlugField(default=uuid.uuid4, editable=False, unique=True)
+    role = models.IntegerField(choices=RoleChoice.choices, default=RoleChoice.DEFAULT)
 
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = []

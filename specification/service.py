@@ -52,6 +52,10 @@ class Specifications:
             return specification
 
     @classmethod
+    def shortlist(cls):
+        return Specification.objects.all()
+
+    @classmethod
     def get_category(cls, category):
         if not isinstance(category, SpecificationCategory):
             try:
