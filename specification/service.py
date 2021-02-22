@@ -201,8 +201,7 @@ class Specifications:
                 total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')),
                 verified=Min(Cast(query_cost.values('verified')[:1], output_field=IntegerField())))
             specifications = Specification.objects.select_related('category').annotate(
-                prime_cost=Subquery(query_res_spec.values('total_cost')),
-                verified=Subquery(query_res_spec.values('verified')[:1]))
+                prime_cost=Subquery(query_res_spec.values('total_cost')))
         except DatabaseError:
             logger.warning(f"list query error. | {cls.__name__}", exc_info=True)
             raise cls.QueryError()
