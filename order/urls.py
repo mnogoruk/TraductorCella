@@ -1,7 +1,7 @@
 from django.urls import path
 
 from order.views import OrderDetailView, OrderCreateView, OrderListView, OrderAssembleSpecificationView, \
-    OrderDisAssembleSpecificationView, OrderManageActionView, OrderAssemblingInfoView, OrderBulkDeleteView
+    OrderDisAssembleSpecificationView, OrderManageActionView, OrderAssemblingInfoView, OrderBulkDeleteView, OrderStatusCount
 
 urlpatterns = [
     path('<int:o_id>/', OrderDetailView.as_view()),
@@ -12,4 +12,5 @@ urlpatterns = [
     path('action/', OrderManageActionView.as_view()),
     path('assemble-info/<int:o_id>/', OrderAssemblingInfoView.as_view()),
     path('delete/', OrderBulkDeleteView.as_view()),
+    path('status-count/', OrderStatusCount.as_view())
 ]

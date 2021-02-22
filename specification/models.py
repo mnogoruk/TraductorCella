@@ -24,6 +24,7 @@ class Specification(models.Model):
     price = models.DecimalField(max_digits=12, decimal_places=2, default=.0)
     amount = models.IntegerField(default=0)
     coefficient = models.DecimalField(max_digits=12, decimal_places=2, default=None, null=True)
+    verified = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.name}"

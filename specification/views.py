@@ -240,5 +240,13 @@ class SpecificationCreateCategoryView(CreateAPIView):
 
 class SpecificationListShortView(ListAPIView):
     serializer_class = SpecificationShortSerializer
+
     def get_queryset(self):
         return Specifications.shortlist()
+
+
+class SpecifiedVerifyPriceCount(APIView):
+    permission_classes = [IsAuthenticated, DefaultPermission]
+
+    def get(self, request, *args, **kwargs):
+        return Response(data={'count': Specifications.verify_price_count()}, status=status.HTTP_202_ACCEPTED)

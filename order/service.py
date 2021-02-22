@@ -3,6 +3,7 @@ import logging
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
+from django.db.models import Count, Q
 
 from cella.service import Operators
 from order.models import Order, OrderSource, OrderSpecification, OrderAction
@@ -298,6 +299,16 @@ class Orders:
             logger.warning(f"Create error | {cls.__name__}", exc_in=True)
             raise cls.CreateError(ex)
         return order
+
+    @classmethod
+    def status_count(cls):
+        count = Order.objects.aggregate(
+            inactive=Count('id', filter=Q(status=Order.OrderStatus.INACTIVE)),
+            active=Count('id', filter=Q(status=Order.OrderStatus.ACTIVE)),
+            assembling=Count('id', filter=Q(status=Order.OrderStatus.ASSEMBLING)),
+            ready=Count('id', filter=Q(status=Order.OrderStatus.READY)),
+        )
+        return count
 
     @classmethod
     def _activate(cls, order, operator):

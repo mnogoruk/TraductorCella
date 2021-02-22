@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 
-from django.db.models import OuterRef, Subquery, Exists, Sum, Min, IntegerField, F
+from django.db.models import OuterRef, Subquery, Exists, Sum, Min, IntegerField, F, Count, Q
 from django.db.models.functions import Cast
 
 from cella.service import Operators
@@ -67,6 +67,11 @@ class Specifications:
             return category
 
     @classmethod
+    def verify_price_count(cls):
+        count = Specification.objects.aggregate(count=Count('id', filter=Q(verified=False)))
+        return count['count']
+
+    @classmethod
     def set_coefficient(cls, specification, coefficient: float, user=None, save=True):
         specification = cls.get(specification)
         specification.coefficient = coefficient
@@ -89,6 +94,7 @@ class Specifications:
     def set_price(cls, specification, price: float, user=None, save=True):
         specification = cls.get(specification)
         specification.price = price
+        specification.verified = True
 
         if price < 0:
             logger.warning(f"specification price < 0 for specification '{specification.id}' | {cls.__name__}")
@@ -170,7 +176,6 @@ class Specifications:
     def detail(cls, specification):
         try:
             specification = cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
-
             query_res_spec = SpecificationResource.objects.filter(specification=specification, resource=OuterRef('pk'))
             cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
             resources = Resource.objects.annotate(
@@ -178,7 +183,6 @@ class Specifications:
                 res_spec_ex=Exists(query_res_spec.values('id')),
                 needed_amount=Subquery(query_res_spec.values('amount')[:1]),
                 verified=Subquery(cost_qr.values('verified')[:1])).filter(res_spec_ex=True)
-            specification.verified = not resources.filter(verified=False).exists()
 
             resources = [{'resource': resource, 'amount': resource.needed_amount} for resource in resources]
             specification.resources = resources
