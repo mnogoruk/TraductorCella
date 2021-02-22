@@ -68,4 +68,12 @@ class CheckVerifyingView(APIView):
 
     def post(self, request, *args, **kwargs):
         verifying_slug = kwargs['verifying_slug']
-        return Response(data={'verified': Account.objects.filter(verifying_slug=verifying_slug, verified=True).exists()})
+        return Response(
+            data={'verified': Account.objects.filter(verifying_slug=verifying_slug, verified=True).exists()})
+
+
+class CheckView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, *args, **kwargs):
+        return Response(data={'correct': True}, status=status.HTTP_200_OK)

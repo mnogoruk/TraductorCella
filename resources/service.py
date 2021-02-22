@@ -7,11 +7,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
-from django.db.models import OuterRef, Subquery, Exists
+from django.db.models import OuterRef, Subquery, Exists, F, Q, Count
 from background_task import background
 
 from cella.models import File
 from cella.service import Operators
+from specification.models import Specification
 from utils.function import random_str
 
 from .models import Resource, ResourceCost, ResourceProvider, ResourceAction
@@ -93,7 +94,18 @@ class Resources:
 
     @classmethod
     def set_cost(cls, resource, cost_value, user, save=True, verified=False):
-        resource = cls.get(resource)
+        if not verified:
+            resource = cls.get(resource, prefetched=['res_specs__specification'])
+            specifications = []
+            for res__spec in resource.res_specs.all():
+                specification = res__spec.specification
+                specification.verified = False
+                specifications.append(specification)
+            Specification.objects.bulk_update(specifications, fields=['verified'])
+
+        else:
+            resource = cls.get(resource)
+
         if cost_value < 0:
             logger.warning(f"resources cost < 0 for resources '{resource.id}'")
         cost = ResourceCost(
@@ -114,6 +126,13 @@ class Resources:
             action.save()
 
         return cost, action
+
+    @classmethod
+    def expired_count(cls):
+        count = Resource.objects.aggregate(
+            count=Count('id', filter=Q(amount_limit__gte=F('amount'))))
+        print(count)
+        return count['count']
 
     @classmethod
     def update_fields(cls, resource, resource_name=None, external_id=None, provider_name: str = None, user=None):

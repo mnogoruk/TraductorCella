@@ -134,6 +134,13 @@ class OrderAssemblingInfoView(APIView):
                         status=status.HTTP_200_OK)
 
 
+class OrderStatusCount(APIView):
+    permission_classes = [IsAuthenticated, DefaultPermission]
+
+    def get(self, request, *args, **kwargs):
+        return Response(data=Orders.status_count(), status=status.HTTP_202_ACCEPTED)
+
+
 class OrderBulkDeleteView(APIView):
     permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 

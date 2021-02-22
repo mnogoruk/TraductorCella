@@ -41,10 +41,12 @@ class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
 
 class SpecificationDetailSerializer(serializers.ModelSerializer):
     resources = SpecificationResourceSerializer(many=True, read_only=True, allow_null=True)
-    price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=0)
+    price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=0,
+                                     default=0)
     coefficient = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True,
-                                           min_value=0)
-    category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+                                           min_value=0, default=0)
+    category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True,
+                                          default=None)
     category = SpecificationCategorySerializer(read_only=True, required=False)
     is_active = serializers.BooleanField(read_only=True)
     resources_create = SpecificationResourceCreateUpdateSerializer(many=True, write_only=True)
@@ -89,12 +91,6 @@ class SpecificationListSerializer(serializers.ModelSerializer):
     verified = serializers.BooleanField(allow_null=True, read_only=True)
     amount = serializers.IntegerField(allow_null=True)
 
-    class Meta:
-        model = Specification
-        fields = '__all__'
-
-
-class SpecificationShortSerializer(serializers.ModelSerializer):
     class Meta:
         model = Specification
         fields = '__all__'

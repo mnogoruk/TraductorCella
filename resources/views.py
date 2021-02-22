@@ -88,6 +88,13 @@ class ResourceWithUnverifiedCostsView(ListAPIView):
             raise QueryError()
 
 
+class ExpiredResourceCount(APIView):
+    permission_classes = [IsAuthenticated, DefaultPermission]
+
+    def get(self, request, *args, **kwargs):
+        return Response(data={'count': Resources.expired_count()}, status=status.HTTP_200_OK)
+
+
 class ResourceListView(ListAPIView):
     IsAuthenticated = [DefaultPermission]
     serializer_class = ResourceSerializer
