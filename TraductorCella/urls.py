@@ -25,6 +25,4 @@ urlpatterns = [
     path('specification/', include('specification.urls')),
     path('order/', include('order.urls')),
     path('authenticate/', include('authentication.urls')),
-    path('__debug__/', include(debug_toolbar.urls)),
-    path('silk/', include('silk.urls'))
 ]

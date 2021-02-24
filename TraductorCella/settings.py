@@ -42,13 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'resources',
     'specification',
-    'background_task',
     'authentication',
     'order',
     'cella',
     'rest_framework',
-    'debug_toolbar',
-    'silk',
     'django_filters',
     'corsheaders'
 ]
