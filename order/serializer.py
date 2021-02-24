@@ -43,7 +43,8 @@ class OrderSerializer(serializers.ModelSerializer):
         order = Orders.create(
             external_id=validated_data['external_id'],
             source=validated_data['source_name'],
-            products=validated_data['specifications_create']
+            products=validated_data['specifications_create'],
+            user=validated_data['request'].user
         )
         return order
 
@@ -63,3 +64,4 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = '__all__'
         read_only_fields = ['status']
+

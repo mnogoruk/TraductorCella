@@ -2,11 +2,12 @@ import logging
 
 from django.http import Http404
 from rest_framework import status
+from rest_framework.authentication import BasicAuthentication
 from rest_framework.generics import RetrieveAPIView, ListAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from order.serializer import OrderSerializer
+from order.serializer import OrderSerializer, OrderGetSerializer
 from order.service import Orders
 from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType
 from utils.pagination import StandardResultsSetPagination
@@ -162,3 +163,5 @@ class OrderCreateView(CreateAPIView):
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)
+
+
