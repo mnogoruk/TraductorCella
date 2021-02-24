@@ -73,12 +73,12 @@ class ProductSerializer(serializers.Serializer):
     def create(self, validated_data):
         pass
 
-    id = serializers.IntegerField(required=True)
+    id = serializers.CharField(required=True)
     amount = serializers.DecimalField(required=True, decimal_places=2, max_digits=12)
 
 
 class OrderGetSerializer(serializers.ModelSerializer):
-    ID = serializers.IntegerField(required=True, allow_null=False, write_only=True)
+    ID = serializers.CharField(required=True, allow_null=False, write_only=True)
     status = serializers.CharField(required=False, allow_null=True, write_only=True)
     products = ProductSerializer(many=True, required=False, allow_null=True, write_only=True)
 
