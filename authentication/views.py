@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from utils.exception import NoParameterSpecified, UpdateError
 from .serializer import UserCreateSerializer, UserEditSerializer, UserSerializer, AccountSerializer
 from .models import Account
-
+from cella.models import Operator
 from authentication.permissions import DefaultPermission, AdminPermission
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,12 @@ class UserCreateView(CreateAPIView):
 class UserEditView(UpdateAPIView):
     serializer_class = UserEditSerializer
     permission_classes = (IsAuthenticated,)
+
+    def perform_update(self, serializer):
+        user = serializer.save()
+        if user.first_name or user.last_name:
+            Operator.objects.filter(user=user).update(name=f"{user.last_name} {user.first_name}")
+        return user
 
     def get_object(self):
         return self.request.user
@@ -42,7 +48,6 @@ class UserChangePasswordView(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        print(request.data)
         password = request.data['password']
         user.set_password(password)
         user.save()

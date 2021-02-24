@@ -12,7 +12,8 @@ from specification.models import Specification
 from specification.serializer import SpecificationCategorySerializer, SpecificationDetailSerializer, \
     SpecificationListSerializer, SpecificationEditSerializer, SpecificationShortSerializer
 from specification.service import Specifications
-from utils.exception import NoParameterSpecified, ParameterExceptions, QueryError, UpdateError, AssembleError
+from utils.exception import NoParameterSpecified, ParameterExceptions, QueryError, UpdateError, AssembleError, \
+    WrongParameterType
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission, \
     AdminPermission
@@ -108,10 +109,13 @@ class SpecificationSetPriceView(APIView):
             logger.warning(f"'id' not specified  | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('id')
         try:
-            value = data['price']
+            value = float(data['price'])
         except KeyError as ex:
             logger.warning(f"'price' not specified  | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('price')
+        except TypeError as ex:
+            logger.warning(f"'price' wrong type")
+            raise WrongParameterType('price', 'float')
         if value is not None and s_id is not None:
             try:
                 Specifications.set_price(specification=s_id, price=value, user=request.user)
@@ -134,10 +138,13 @@ class SpecificationSetCoefficientView(APIView):
             raise NoParameterSpecified('id')
         try:
             logger.warning(f"'coefficient' not specified | {self.__class__.__name__}", exc_info=True)
-            value = data['coefficient']
+            value = float(data['coefficient'])
         except KeyError as ex:
             logger.warning(f"'coefficient' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('coefficient')
+        except TypeError as ex:
+            logger.warning(f"'coefficient' wrong type")
+            raise WrongParameterType('coefficient', 'float')
         if value is not None and s_id is not None:
             try:
                 Specifications.set_coefficient(specification=s_id, coefficient=value, user=request.user)
@@ -198,12 +205,15 @@ class SpecificationBuildSetView(APIView):
             s_id = data['id']
         except KeyError as ex:
             logger.warning(f"'id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified(detail='id not specified.')
+            raise NoParameterSpecified('id')
         try:
-            amount = data['amount']
+            amount = float(data['amount'])
         except KeyError as ex:
-            logger.warning(f"'cost' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified(detail='amount not specified.')
+            logger.warning(f"'amount' not specified | {self.__class__.__name__}", exc_info=True)
+            raise NoParameterSpecified('amount')
+        except TypeError as ex:
+            logger.warning(f"'amount' wrong type")
+            raise NoParameterSpecified('amount')
 
         from_resources = data.get('from_resources', False)
         try:

@@ -16,7 +16,7 @@ from resources.serializer import ResourceSerializer, ResourceWithUnverifiedCostS
     ResourceShortSerializer, ResourceProviderSerializer
 from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
-    QueryError
+    QueryError, WrongParameterType
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, AdminPermission, StorageWorkerPermission, \
     DefaultPermission
@@ -114,7 +114,6 @@ class ResourceListView(ListAPIView):
 
     def get_queryset(self):
         try:
-            print("START-RESOURCES")
             return Resources.list()
         except Resources.QueryError:
             logger.warning(f"Query error | ResourceListView")
@@ -156,10 +155,13 @@ class ResourceSetCostView(APIView):
             logger.warning(f"'id' not specified | ResourceSetCostView")
             raise NoParameterSpecified('id')
         try:
-            value = data['cost']
+            value = float(data['cost'])
         except KeyError as ex:
             logger.warning(f"'cost' not specified | ResourceSetCostView")
             raise NoParameterSpecified('cost')
+        except TypeError as ex:
+            logger.warning(f"'cost' wrong type")
+            raise WrongParameterType('cost', 'float')
         if value is not None:
             try:
                 cost, _ = Resources.set_cost(r_id, value, request.user)
@@ -182,10 +184,13 @@ class ResourceAddAmountView(APIView):
             logger.warning(f"'id' not specified | ResourceAddAmountView")
             raise NoParameterSpecified('id')
         try:
-            delta_amount = data['amount']
+            delta_amount = float(data['amount'])
         except KeyError as ex:
             logger.warning(f"'amount' not specified | ResourceAddAmountView")
             raise NoParameterSpecified('amount')
+        except TypeError as ex:
+            logger.warning(f"'amount' wrong type")
+            WrongParameterType('cost', 'float')
         try:
             amount, _ = Resources.change_amount(r_id, delta_amount, user=request.user)
         except Resources.UpdateError:

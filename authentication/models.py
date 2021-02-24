@@ -4,6 +4,7 @@ from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin, User
 from django.contrib import auth
 from django.db import models
+from django.apps import apps
 
 
 class RoleChoice(models.IntegerChoices):
@@ -26,12 +27,16 @@ class UserManager(BaseUserManager):
         user = self.model(username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
+        Operator = apps.get_model('cella', 'Operator')
+        Operator.objects.create(user=user, name=user.username)
         return user
 
     def create_user(self, username, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
-        return self._create_user(username, password, **extra_fields)
+        user = self._create_user(username, password, **extra_fields)
+
+        return user
 
     def create_superuser(self, username, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
