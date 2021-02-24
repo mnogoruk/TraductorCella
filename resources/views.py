@@ -114,6 +114,7 @@ class ResourceListView(ListAPIView):
 
     def get_queryset(self):
         try:
+            print("START-RESOURCES")
             return Resources.list()
         except Resources.QueryError:
             logger.warning(f"Query error | ResourceListView")

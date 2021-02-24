@@ -34,16 +34,16 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Account
-        fields = ['role', 'password', 'username', 'username']
+        fields = ['role', 'password', 'username']
 
     def create(self, validated_data):
+        print(validated_data)
         password = create_password()
         username = create_username(validated_data['role'])
         account = Account.objects.create_user(
             username=username,
             password=password,
-            role=validated_data['role'],
-            email=validated_data['email']
+            role=validated_data['role']
         )
 
         account.username = username
@@ -58,10 +58,16 @@ class UserEditSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         instance.verified = True
-        return super(instance, validated_data)
+        return super().update(instance, validated_data)
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = ['username', 'role', 'first_name', 'last_name', 'email']
+
+
+class AccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        fields = ['username', 'first_name', 'last_name', 'is_banned', 'email', 'role']
