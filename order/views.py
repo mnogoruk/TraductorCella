@@ -178,5 +178,6 @@ class ReceiveOrderView(CreateAPIView):
             self.create(request, *args, **kwargs)
             return Response(data={'received': True}, status=status.HTTP_202_ACCEPTED)
         except Exception as ex:
+            logger.warning("Can't receive order", stack_info=True, exc_info=True)
             return Response(data={'received': False}, status=status.HTTP_400_BAD_REQUEST)
 
