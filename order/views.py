@@ -165,3 +165,18 @@ class OrderCreateView(CreateAPIView):
         return serializer.save(request=self.request)
 
 
+class ReceiveOrderView(CreateAPIView):
+    serializer_class = OrderGetSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (BasicAuthentication,)
+
+    def perform_create(self, serializer):
+        return serializer.save(request=self.request)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            self.create(request, *args, **kwargs)
+            return Response(data={'received': True}, status=status.HTTP_202_ACCEPTED)
+        except Exception as ex:
+            return Response(data={'received': False}, status=status.HTTP_400_BAD_REQUEST)
+
