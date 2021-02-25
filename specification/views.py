@@ -244,7 +244,6 @@ class SpecificationBulkDeleteView(APIView):
 
 class SpecificationCreateCategoryView(CreateAPIView):
     permission_classes = [IsAuthenticated, OfficeWorkerPermission]
-
     serializer_class = SpecificationCategorySerializer
 
 

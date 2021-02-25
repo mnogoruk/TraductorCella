@@ -14,9 +14,14 @@ logger = logging.getLogger(__name__)
 
 # Resources
 class TestView(APIView):
-    authentication_classes = (BasicAuthentication,)
+    permission_classes = ()
+    authentication_classes = ()
 
     def get(self, request, *args, **kwargs):
+        logger.warning("WARNING")
+        logger.debug("DEBUG")
+        logger.info("INFO")
+        logger.error("ERROR")
         with transaction.atomic():
             t1 = Test1.objects.create(test='ew', var=23)
             t2 = Test2(tt='1', bb=2.3, v=t1)

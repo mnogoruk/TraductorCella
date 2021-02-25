@@ -19,9 +19,6 @@ class Orders:
     class AssembleError(Exception):
         pass
 
-    class CanNotManageAction(Exception):
-        pass
-
     class DoesNotExist(ObjectDoesNotExist):
         pass
 
@@ -34,13 +31,16 @@ class Orders:
     class QueryError(Exception):
         pass
 
+    class ActionError(Exception):
+        pass
+
     @classmethod
     def get(cls, order):
         if not isinstance(order, Order):
             try:
                 return Order.objects.select_related('source').get(id=order)
             except IntegrityError:
-                logger.warning(f"Order does not exist. Id: '{order}' | {cls.__name__}", exc_in=True)
+                logger.warning(f"Order does not exist. Id: '{order}' | {cls.__name__}", exc_info=True)
                 raise cls.DoesNotExist()
         else:
             return order
@@ -101,7 +101,7 @@ class Orders:
                         miss_resources.add(resource.id)
                         miss_specification.add(specification.id)
         except Exception:
-            logger.warning(f"Assembling info error | {cls.__name__}", exc_in=True)
+            logger.warning(f"Assemble info error. order: {order} | {cls.__name__}", exc_info=True)
             raise cls.AssembleError()
         return miss_specification, miss_resources
 
@@ -131,6 +131,7 @@ class Orders:
         specification = Specifications.get(specification)
 
         if not (order.status == Order.OrderStatus.ACTIVE or order.status == Order.OrderStatus.ASSEMBLING):
+            logger.warning(f"Can't assemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
             raise cls.AssembleError()
 
         operator = Operators.get_operator(user)
@@ -150,16 +151,20 @@ class Orders:
                 cls._ready(order, operator)
             order.save()
         except DatabaseError:
-            logger.warning(f"Assembling specification error | {cls.__name__}", exc_in=True)
+            logger.warning(f"Assembling specification error. Order: {order} | {cls.__name__}", exc_info=True)
             raise cls.AssembleError()
 
     @classmethod
     def disassemble_specification(cls, order, specification, user=None):
         order = cls.get(order)
         specification = Specifications.get(specification)
+
+        if not (order.status == Order.OrderStatus.READY or order.status == Order.OrderStatus.ASSEMBLING):
+            logger.warning(
+                f"Can't disassemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
+            raise cls.AssembleError()
+
         try:
-            if not (order.status == Order.OrderStatus.READY or order.status == Order.OrderStatus.ASSEMBLING):
-                raise cls.AssembleError()
 
             operator = Operators.get_operator(user)
 
@@ -193,12 +198,30 @@ class Orders:
 
     @classmethod
     def confirm(cls, order, user):
-        order = Order.objects.get(id=order)
-        if not order.status == Order.OrderStatus.READY:
-            logger.warning(f"Confirm error | {cls.__name__}", exc_in=True)
-            raise cls.CanNotManageAction()
-        cls._confirm(order, Operators.get_operator(user))
-        order.save()
+        try:
+            order = cls.get(order)
+            if not order.status == Order.OrderStatus.READY:
+                logger.warning(f"Cant confirm order with status {order.status}. Order: {order} | {cls.__name__}")
+                raise cls.ActionError()
+            cls._confirm(order, Operators.get_operator(user))
+            order.save()
+        except Exception:
+            logger.warning("")
+            raise cls.ActionError()
+
+    @classmethod
+    def cancel(cls, order, user):
+        order = cls.get(order)
+        if order.status in [Order.OrderStatus.READY, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.ACTIVE]:
+            cls.deactivate(order, user)
+            cls._cancel(order, user)
+        elif order.status in [Order.OrderStatus.CANCELED, Order.OrderStatus.ARCHIVED]:
+            logger.warning(f"Can't cancel order with status {order.status}. Order: {order} | {cls.__name__}")
+            raise cls.ActionError()
+        elif order.status == Order.OrderStatus.INACTIVE:
+            cls._cancel(order, user)
+        else:
+            logger.warning(f"Can't cancel order. Unexpected status {order.status}. Order: {order} | {cls.__name__}")
 
     @classmethod
     def activate(cls, order, user):
@@ -208,6 +231,10 @@ class Orders:
             'order_specification__specification__res_specs',
             'order_specification__specification__res_specs__resource',
         ).get(id=order)
+
+        if not order.status == Order.OrderStatus.INACTIVE:
+            logger.warning(f"Can't activate order with status {order.status}. Order: {order} | {cls.__name__}")
+            raise cls.ActionError()
 
         order_specs = order.order_specification
         operator = Operators.get_operator(user)
@@ -232,16 +259,15 @@ class Orders:
                                                 operator)
 
                     else:
-                        raise cls.CanNotManageAction(f"resource {resource.name}, amount {amount}")
+                        raise cls.ActionError(f"resource {resource.name}, amount {amount}")
 
                 specification.save()
 
-            if not order.status == Order.OrderStatus.INACTIVE:
-                raise cls.CanNotManageAction()
             cls._activate(order, Operators.get_operator(user))
             order.save()
         except DatabaseError:
-            logger.warning(f"Activation error | {cls.__name__}", exc_in=True)
+            logger.warning(f"Activation error. Order: {order} | {cls.__name__}", exc_info=True)
+            raise cls.ActionError()
 
     @classmethod
     def deactivate(cls, order, user):
@@ -249,7 +275,9 @@ class Orders:
         operator = Operators.get_operator(user)
 
         if order.status not in [Order.OrderStatus.ACTIVE, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.READY]:
-            raise cls.CanNotManageAction()
+            logger.warning(f"Can't deactivate order with status {order.status}. Order: {order} | {cls.__name__}",
+                           exc_info=True)
+            raise cls.ActionError()
 
         order_specs = order.order_specification
         try:
@@ -266,7 +294,8 @@ class Orders:
             cls._deactivate(order, Operators.get_operator(user))
             order.save()
         except DatabaseError:
-            logger.warning(f"Deactivate error | {cls.__name__}", exc_in=True)
+            logger.warning(f"Can't deactivate order. Order: {order} | {cls.__name__}", exc_info=True)
+            raise cls.ActionError()
 
     @classmethod
     def create(cls, external_id, source: str = None, products: List[Dict[str, str]] = None, user=None):
@@ -307,7 +336,7 @@ class Orders:
                     order.specifications = order_specs_dict
 
         except DatabaseError as ex:
-            logger.warning(f"Create error | {cls.__name__}", exc_in=True)
+            logger.warning(f"Create error | {cls.__name__}", exc_info=True)
             raise cls.CreateError(ex)
         return order
 
