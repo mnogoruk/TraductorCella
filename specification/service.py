@@ -396,7 +396,7 @@ class Specifications:
                 except SpecificationResource.DoesNotExist:
                     raise Resources.ResourceDoesNotExist()
         except DatabaseError as ex:
-            logger.error(f"Specification edit error.  | {cls.__name__}", exc_info=True)
+            logger.error(f"Specification edit error. | {cls.__name__}", exc_info=True)
             raise cls.EditError()
 
         return specification

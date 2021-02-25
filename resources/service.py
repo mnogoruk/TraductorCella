@@ -1,15 +1,10 @@
 import asyncio
-import threading
-import time
-
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
 from django.db.models import OuterRef, Subquery, Exists, F, Q, Count
-from background_task import background
-
 from cella.models import File
 from cella.service import Operators
 from specification.models import Specification
@@ -131,7 +126,6 @@ class Resources:
     def expired_count(cls):
         count = Resource.objects.aggregate(
             count=Count('id', filter=Q(amount_limit__gte=F('amount'))))
-        print(count)
         return count['count']
 
     @classmethod
@@ -163,6 +157,7 @@ class Resources:
                         value="|".join(value_data)
                     )
         except DatabaseError:
+            logger.warning(f"Update error | {cls.__name__}", exc_info=True)
             raise cls.UpdateError()
 
         return cls.detail(resource)
@@ -174,7 +169,7 @@ class Resources:
         try:
             cost = ResourceCost.objects.filter(resource=resource).latest('time_stamp')
         except ResourceCost.DoesNotExist:
-            logger.warning(f"ResourceCost does not exist for Resource with id '{resource.id}'")
+            logger.warning(f"ResourceCost does not exist for Resource '{resource}' | {cls.__name__}", exc_info=True)
             cost = ResourceCost.objects.create(resource=resource, value=0)
 
         resource.cost = cost.value
@@ -228,7 +223,8 @@ class Resources:
 
         except DatabaseError as ex:
             logger.warning(f"Create error resource_name={resource_name}, external_id={external_id}, "
-                           f"cost_value={cost_value}, amount_value={amount_value}, provider_name={provider_name}")
+                           f"cost_value={cost_value}, amount_value={amount_value}, provider_name={provider_name} | "
+                           f"{cls.__name__}", exc_info=True)
             raise cls.CreateError(ex)
 
         return resource
@@ -243,7 +239,7 @@ class Resources:
                 cls.create(**resource)
             except cls.ExternalIdUniqueError as ex:
                 errors.append(ex)
-                logger.warning(f"Exceptions caught while bulk creating {ex}")
+                logger.warning(f"Exceptions caught while bulk creating {ex} | {cls.__name__}", exc_info=True)
                 continue
         return errors
 
@@ -262,7 +258,7 @@ class Resources:
                 verified=Subquery(cost_qr.values('verified')[:1]),
             )
         except DatabaseError as ex:
-            logger.error(f"Error while getting resource list: {ex}")
+            logger.error(f"Error while getting resource list: {ex} | {cls.__name__}", exc_info=True)
             raise cls.QueryError()
 
         return query.order_by('verified')
@@ -295,7 +291,7 @@ class Resources:
             ).filter(verified=False)
             return query
         except DatabaseError as ex:
-            logger.error(f"Database error: {ex}")
+            logger.error(f"Database error: {ex} | {cls.__name__}", exc_info=True)
             raise cls.QueryError()
 
     @classmethod

@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
 from order.service import Orders
-from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType
+from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 
@@ -27,7 +27,6 @@ class OrderDetailView(RetrieveAPIView):
         except Orders.DoesNotExist:
             logger.warning(f"Can`t get object 'Order' with id: {o_id} | {self.__class__.__name__}", exc_info=True)
             raise Http404
-        self.check_object_permissions(request=self.request, obj=order)
 
         return order
 
@@ -41,7 +40,8 @@ class OrderListView(ListAPIView):
         try:
             return Orders.list()
         except Orders.QueryError:
-            logger.warning(f"List error | {self.__class__.__name__}", exc_info=True)
+            logger.warning(f"Queryset error | {self.__class__.__name__}", exc_info=True)
+            raise QueryError()
 
 
 class OrderAssembleSpecificationView(APIView):
@@ -56,7 +56,7 @@ class OrderAssembleSpecificationView(APIView):
             logger.warning(f"'order_id' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('order_id')
         try:
-            specification_id = data.get('specification_id', None)
+            specification_id = data['specification_id']
         except KeyError as ex:
             logger.warning(f"'specification_id' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('specification_id')
@@ -64,10 +64,16 @@ class OrderAssembleSpecificationView(APIView):
         if order_id is not None and specification_id is not None:
             try:
                 Orders.assemble_specification(order_id, specification_id)
+                return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
             except Orders.AssembleError:
-                logger.warning(f"assemble info. | {self.__class__.__name__}", exc_info=True)
-            return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
+                logger.warning(
+                    f"Assemble info. Specification id: {specification_id}, order id: {order_id} | "
+                    f"{self.__class__.__name__}", exc_info=True)
         else:
+            if order_id is None:
+                logger.warning(f"order id is not specified | {self.__class__.__name__}")
+            if specification_id is None:
+                logger.warning(f"specification id is not specified | {self.__class__.__name__}")
             raise NoParameterSpecified()
 
 
@@ -80,17 +86,29 @@ class OrderDisAssembleSpecificationView(APIView):
         try:
             order_id = data['order_id']
         except KeyError as ex:
+            logger.warning(f"'order_id' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('order_id')
 
         try:
             specification_id = data.get('specification_id', None)
         except KeyError as ex:
+            logger.warning(f"'specification_id' not specified | {self.__class__.__name__}", exc_info=True)
+
             raise NoParameterSpecified('specification_id')
 
         if order_id is not None and specification_id is not None:
-            Orders.disassemble_specification(order_id, specification_id)
-            return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
+            try:
+                Orders.disassemble_specification(order_id, specification_id)
+                return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
+            except Orders.AssembleError:
+                logger.warning(
+                    f"Disassemble info. Specification id: {specification_id}, order id: {order_id} | "
+                    f"{self.__class__.__name__}", exc_info=True)
         else:
+            if order_id is None:
+                logger.warning(f"order id is None | {self.__class__.__name__}")
+            if specification_id is None:
+                logger.warning(f"specification id None | {self.__class__.__name__}")
             raise NoParameterSpecified()
 
 
@@ -103,24 +121,35 @@ class OrderManageActionView(APIView):
         try:
             order_id = data['id']
         except KeyError as ex:
+            logger.warning(f"'id' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('id')
 
         try:
-            action = data.get('action', None)
+            action = data['action']
         except KeyError as ex:
+            logger.warning(f"'action' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('action')
 
         if order_id is not None and action is not None:
-            if action == 'activate':
-                Orders.activate(order_id, request.user)
-            elif action == 'deactivate':
-                Orders.deactivate(order_id, request.user)
-            elif action == 'confirm':
-                Orders.confirm(order_id, request.user)
-            else:
-                raise WrongParameterValue('action')
+            try:
+                if action == 'activate':
+                    Orders.activate(order_id, request.user)
+                elif action == 'deactivate':
+                    Orders.deactivate(order_id, request.user)
+                elif action == 'confirm':
+                    Orders.confirm(order_id, request.user)
+                elif action == 'cancel':
+                    Orders.cancel(order_id, request.user)
+                else:
+                    raise WrongParameterValue('action')
+            except Orders.ActionError:
+                logger.warning(f"Manage action error for order with id: {order_id} | {self.__class__.__name__}")
             return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
         else:
+            if order_id is None:
+                logger.warning(f"id id is None| {self.__class__.__name__}")
+            if action is None:
+                logger.warning(f"action is none | {self.__class__.__name__}")
             raise NoParameterSpecified()
 
 
@@ -150,6 +179,7 @@ class OrderBulkDeleteView(APIView):
         try:
             ids = data['ids']
         except KeyError as ex:
+            logger.warning(f"'ids' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('ids')
         if not isinstance(ids, list):
             raise WrongParameterType('ids', 'list')
@@ -174,6 +204,7 @@ class ReceiveOrderView(CreateAPIView):
         return serializer.save(request=self.request)
 
     def post(self, request, *args, **kwargs):
+        logger.info(f"Received order {request.data} | {self.__class__.__name__}")
         try:
             self.create(request, *args, **kwargs)
             return Response(data={'received': True}, status=status.HTTP_202_ACCEPTED)

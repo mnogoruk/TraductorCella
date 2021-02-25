@@ -1,4 +1,4 @@
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.http import Http404
 from rest_framework import status
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -34,9 +34,8 @@ class ResourceDetailView(RetrieveAPIView):
         try:
             resource = Resources.detail(r_id)
         except Resource.DoesNotExist:
-            logger.warning(f"Can`t get object 'Resource' with id: {r_id} | ResourceDetailView")
+            logger.warning(f"Can`t get object 'Resource' with id: {r_id} | {self.__class__.__name__}")
             raise Http404()
-        self.check_object_permissions(request=self.request, obj=resource)
 
         return resource
 
@@ -49,7 +48,9 @@ class ResourceCreateView(CreateAPIView):
         try:
             serializer.save(request=self.request)
         except Resources.CreateError:
-            logger.warning("Error while creating Resource | ResourceCreateView")
+            logger.warning(
+                f"Error while creating Resource. Request data: {self.request.data} | {self.__class__.__name__}",
+                exc_info=True)
             raise CreationError()
 
 
@@ -61,7 +62,9 @@ class ResourceUpdateView(UpdateAPIView):
         try:
             serializer.save(request=self.request)
         except Resources.UpdateError as ex:
-            logger.warning("Error while updating Resource | ResourceUpdateView")
+            logger.warning(
+                f"Error while updating Resource. Resource data: {self.request.data}| {self.__class__.__name__}",
+                exc_info=True)
             raise UpdateError()
 
     def get_object(self):
@@ -69,9 +72,8 @@ class ResourceUpdateView(UpdateAPIView):
         try:
             resource = Resources.get(r_id)
         except Resource.DoesNotExist:
-            logger.warning("Can`t get object 'Resource'. | ResourceUpdateView")
+            logger.warning(f"Can`t get object 'Resource'. | {self.__class__.__name__}", exc_info=True)
             raise Http404()
-        self.check_object_permissions(request=self.request, obj=resource)
 
         return resource
 
@@ -84,7 +86,7 @@ class ResourceWithUnverifiedCostsView(ListAPIView):
         try:
             return Resources.with_unverified_cost()
         except Resources.QueryError:
-            logger.warning(f"Query error | ResourceWithUnverifiedCostsView")
+            logger.warning(f"Query error | {self.__class__.__name__}", exc_info=True)
             raise QueryError()
 
 
@@ -128,7 +130,7 @@ class ResourceActionsView(ListAPIView):
         try:
             return Resources.actions(self.kwargs['r_id'])
         except Resources.QueryError:
-            logger.warning(f"Query error | ResourceActionsView")
+            logger.warning(f"Query error | {self.__class__.__name__}", exc_info=True)
             raise QueryError()
 
 
@@ -140,7 +142,7 @@ class ResourceShortListView(ListAPIView):
         try:
             return Resources.shortlist()
         except Resources.QueryError:
-            logger.warning(f"Query error | ResourceShortListView")
+            logger.warning(f"Query error | {self.__class__.__name__}", exc_info=True)
             raise QueryError()
 
 
@@ -152,12 +154,12 @@ class ResourceSetCostView(APIView):
         try:
             r_id = data['id']
         except KeyError as ex:
-            logger.warning(f"'id' not specified | ResourceSetCostView")
+            logger.warning(f"'id' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('id')
         try:
             value = float(data['cost'])
         except KeyError as ex:
-            logger.warning(f"'cost' not specified | ResourceSetCostView")
+            logger.warning(f"'cost' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('cost')
         except TypeError as ex:
             logger.warning(f"'cost' wrong type")
@@ -166,10 +168,11 @@ class ResourceSetCostView(APIView):
             try:
                 cost, _ = Resources.set_cost(r_id, value, request.user)
             except Resources.UpdateError:
-                logger.warning(f"Update error | ResourceSetCostView")
+                logger.warning(f"Update error | {self.__class__.__name__}")
                 raise UpdateError()
             return Response(data={'id': r_id, 'cost': cost.value}, status=status.HTTP_202_ACCEPTED)
         else:
+            logger.warning(f"Set cost | {self.__class__.__name__}")
             raise NoParameterSpecified()
 
 
@@ -181,20 +184,20 @@ class ResourceAddAmountView(APIView):
         try:
             r_id = data['id']
         except KeyError as ex:
-            logger.warning(f"'id' not specified | ResourceAddAmountView")
+            logger.warning(f"'id' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('id')
         try:
             delta_amount = float(data['amount'])
         except KeyError as ex:
-            logger.warning(f"'amount' not specified | ResourceAddAmountView")
+            logger.warning(f"'amount' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('amount')
         except TypeError as ex:
-            logger.warning(f"'amount' wrong type")
+            logger.warning(f"'amount' wrong type | {self.__class__.__name__}")
             WrongParameterType('cost', 'float')
         try:
             amount, _ = Resources.change_amount(r_id, delta_amount, user=request.user)
         except Resources.UpdateError:
-            logger.warning(f"Update error | ResourceAddAmountView")
+            logger.warning(f"Update error | {self.__class__.__name__}", exc_info=True)
             raise UpdateError()
         return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
 
@@ -207,16 +210,16 @@ class ResourceVerifyCostView(APIView):
         try:
             ids = data['ids']
         except KeyError as ex:
-            logger.warning(f"'id' not specified | ResourceVerifyCostView")
+            logger.warning(f"'id' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('ids')
         if not isinstance(ids, list):
-            logger.warning(f"'ids' has wrong type. Type: {type(ids)} | ResourceVerifyCostView")
+            logger.warning(f"'ids' has wrong type. Type: {type(ids)} | {self.__class__.__name__}")
             raise ParameterExceptions(detail="'ids' must be list object.")
         if ids is not None:
             try:
                 Resources.verify_cost(ids, request.user)
             except Resources.UpdateError:
-                logger.warning(f"Update error | ResourceVerifyCostView")
+                logger.warning(f"Update error | {self.__class__.__name__}", exc_info=True)
                 raise UpdateError()
             return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
@@ -251,7 +254,7 @@ class ResourceExelUploadView(CreateAPIView):
             creation = async_to_sync(Resources.create_from_excel)
             creation(file_instance_id=instance.id, operator_id=operator.id)
         except Exception as e:
-            logger.warning("File error | ResourceExelUploadView", exc_info=True)
+            logger.warning(f"File error. File: {response}| {self.__class__.__name__}", exc_info=True)
             raise FileException()
         return response
 
@@ -270,14 +273,14 @@ class ResourceBulkDeleteView(APIView):
         try:
             ids = data['ids']
         except KeyError as ex:
-            logger.warning(f"'id' not specified | ResourceBulkDeleteView")
+            logger.warning(f"'id' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('ids')
         if not isinstance(ids, list):
-            logger.warning(f"'ids' has wrong type. Type: {type(ids)} | ResourceBulkDeleteView")
+            logger.warning(f"'ids' has wrong type. Type: {type(ids)} | {self.__class__.__name__}")
             raise ParameterExceptions(detail="'ids' must be list object.")
         try:
             Resources.bulk_delete(ids, request.user)
         except Resources.UpdateError:
-            logger.warning("Update error | ResourceBulkDeleteView")
+            logger.warning("Update error | {self.__class__.__name__}")
             raise UpdateError()
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
