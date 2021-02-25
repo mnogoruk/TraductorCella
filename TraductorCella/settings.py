@@ -42,8 +42,6 @@ INSTALLED_APPS = [
     'order',
     'cella',
     'rest_framework',
-    'debug_toolbar',
-    'silk',
     'django_filters',
     'corsheaders'
 ]
@@ -57,8 +55,6 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
-    'silk.middleware.SilkyMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
