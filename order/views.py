@@ -7,7 +7,7 @@ from rest_framework.generics import RetrieveAPIView, ListAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from order.serializer import OrderSerializer, OrderGetSerializer
+from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
 from order.service import Orders
 from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType
 from utils.pagination import StandardResultsSetPagination
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class OrderDetailView(RetrieveAPIView):
-    serializer_class = OrderSerializer
+    serializer_class = OrderDetailSerializer
     permission_classes = [IsAuthenticated, DefaultPermission]
 
     def get_object(self):

@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from order.models import OrderSpecification, OrderSource, Order
 from order.service import Orders
-from specification.serializer import SpecificationShortSerializer
+from specification.serializer import SpecificationShortSerializer, SpecificationSerializer
 
 
 class OrderSpecificationSerializer(serializers.ModelSerializer):
@@ -11,6 +11,14 @@ class OrderSpecificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderSpecification
         fields = ['specification', 'amount', 'assembled']
+
+
+class OrderDetailSpecificationSerializer(serializers.ModelSerializer):
+    specification = SpecificationSerializer()
+
+    class Meta:
+        model = OrderSpecification
+        fields = '__all__'
 
 
 class OrderSpecificationCreateUpdateSerializer(serializers.Serializer):
@@ -27,6 +35,17 @@ class OrderSpecificationCreateUpdateSerializer(serializers.Serializer):
 class OrderSourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderSource
+        fields = "__all__"
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
+    order_specification = OrderDetailSpecificationSerializer(many=True, read_only=True)
+
+    missing_resources = serializers.ListField(read_only=True, allow_null=True)
+    missing_specifications = serializers.ListField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = Order
         fields = '__all__'
 
 

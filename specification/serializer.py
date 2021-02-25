@@ -39,6 +39,14 @@ class SpecificationResourceCreateUpdateSerializer(serializers.Serializer):
         pass
 
 
+class SpecificationSerializer(serializers.ModelSerializer):
+    res_specs = SpecificationResourceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Specification
+        fields = '__all__'
+
+
 class SpecificationDetailSerializer(serializers.ModelSerializer):
     resources = SpecificationResourceSerializer(many=True, read_only=True, allow_null=True)
     price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=0,
