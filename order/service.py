@@ -110,8 +110,19 @@ class Orders:
         order = Order.objects.prefetch_related(
             'order_specification',
             'order_specification__specification',
+            'order_specification__specification__res_specs',
+            'order_specification__specification__res_specs__resource',
+            'order_specification__specification__res_specs__resource__resourcecost_set'
         ).get(id=order)
+        m, n = cls.assembling_info(order)
+        order.missing_resources = n
+        order.missing_specifications = m
 
+        for oder_spec in order.order_specification.all():
+            spec = oder_spec.specification
+            for res_spec in spec.res_specs.all():
+                resource = res_spec.resource
+                resource.cost = resource.resourcecost_set.last().value
         return order
 
     @classmethod
