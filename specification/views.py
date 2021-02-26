@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from django.http import Http404
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, RetrieveUpdateAPIView
@@ -6,6 +7,9 @@ from logging import getLogger
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+
+from cella.serializer import FileSerializer
+from cella.service import Operators
 from resources.models import Resource
 from resources.service import Resources
 from specification.models import Specification
@@ -13,7 +17,7 @@ from specification.serializer import SpecificationCategorySerializer, Specificat
     SpecificationListSerializer, SpecificationEditSerializer, SpecificationShortSerializer
 from specification.service import Specifications
 from utils.exception import NoParameterSpecified, ParameterExceptions, QueryError, UpdateError, AssembleError, \
-    WrongParameterType
+    WrongParameterType, FileException
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission, \
     AdminPermission
@@ -118,7 +122,7 @@ class SpecificationSetPriceView(APIView):
             raise WrongParameterType('price', 'float')
         if value is not None and s_id is not None:
             try:
-                Specifications.set_price(specification=s_id, price=value, user=request.user)
+                Specifications.set_price(specification=s_id, price=value, user=request.user, send=True)
             except Specifications.EditError:
                 logger.warning(f"Set price error | {self.__class__.__name__}", exc_info=True)
             return Response(data={'id': s_id, 'price': value}, status=status.HTTP_202_ACCEPTED)
@@ -259,3 +263,32 @@ class SpecifiedVerifyPriceCount(APIView):
 
     def get(self, request, *args, **kwargs):
         return Response(data={'count': Specifications.verify_price_count()}, status=status.HTTP_202_ACCEPTED)
+
+
+class SpecificationXMLUploadView(CreateAPIView):
+    serializer_class = FileSerializer
+    permission_classes = ()
+    authentication_classes = ()
+
+    def __init__(self, **kwargs):
+        super(SpecificationXMLUploadView, self).__init__(**kwargs)
+        self.instance = None
+
+    def post(self, request, *args, **kwargs):
+        response = super(SpecificationXMLUploadView, self).post(request, *args, **kwargs)
+        instance = self.get_instance()
+        print("deedededededededelzskrfnkbjdnafzskv bksdb xfkved")
+        try:
+            operator = Operators.get_operator(request.user)
+            creation = async_to_sync(Specifications.create_from_xml)
+            creation(file_instance_id=instance.id, operator_id=operator.id)
+        except Exception as e:
+            logger.warning(f"File error. File: {response}| {self.__class__.__name__}", exc_info=True)
+            raise FileException()
+        return response
+
+    def perform_create(self, serializer):
+        self.instance = serializer.save()
+
+    def get_instance(self):
+        return self.instance

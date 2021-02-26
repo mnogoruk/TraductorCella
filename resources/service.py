@@ -1,13 +1,18 @@
 import asyncio
-from asgiref.sync import sync_to_async
+
+import aiohttp
+from asgiref.sync import sync_to_async, async_to_sync
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
-from django.db.models import OuterRef, Subquery, Exists, F, Q, Count
+from django.db.models import OuterRef, Subquery, Exists, F, Q, Count, Sum, Min
+from django.db.models.functions import Cast
+
 from cella.models import File
 from cella.service import Operators
-from specification.models import Specification
+from specification.models import Specification, SpecificationResource
 from utils.function import random_str
 
 from .models import Resource, ResourceCost, ResourceProvider, ResourceAction
@@ -88,7 +93,7 @@ class Resources:
         return resource.amount, action
 
     @classmethod
-    def set_cost(cls, resource, cost_value, user, save=True, verified=False):
+    def set_cost(cls, resource, cost_value, user, save=True, verified=False, send=False):
         if not verified:
             resource = cls.get(resource, prefetched=['res_specs__specification'])
             specifications = []
@@ -119,7 +124,18 @@ class Resources:
         if save:
             cost.save()
             action.save()
+            query_cost = ResourceCost.objects.filter(resource_id=OuterRef('resource_id')).order_by('-time_stamp')
 
+            query_res_spec = SpecificationResource.objects.filter(
+                specification=OuterRef('pk'),
+            ).values('specification_id').annotate(
+                total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')))
+
+            specifications = Specification.objects.filter(res_specs__resource=resource).annotate(
+                prime_cost=Subquery(query_res_spec.values('total_cost'))).values('product_id', 'prime_cost')
+            spc = async_to_sync(cls.send_prime_cost)
+
+            spc(specifications)
         return cost, action
 
     @classmethod
@@ -325,6 +341,11 @@ class Resources:
         asyncio.create_task(create_from_excel(file_instance_id, operator_id))
         return
 
+    @classmethod
+    async def send_prime_cost(cls, products):
+        asyncio.create_task(send_prime_cost(products))
+        return
+
 
 async def create_from_excel(file_instance_id, operator_id=None):
     try:
@@ -403,3 +424,12 @@ async def create_from_excel(file_instance_id, operator_id=None):
     except Exception as ex:
         logger.warning(f"Error while creating resources from excel", exc_info=True)
         raise Resources.CreateError()
+
+
+bitrix_url = settings.BITRIX_URL + "cella/test/"
+
+
+async def send_prime_cost(products):
+    async with aiohttp.ClientSession() as session:
+        for product in products:
+            await session.post(bitrix_url, data={"ID": product["product_id"], "primeCost": product['prime_cost']})

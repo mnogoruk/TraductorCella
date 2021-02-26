@@ -215,7 +215,7 @@ class Orders:
         if order.status in [Order.OrderStatus.READY, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.ACTIVE]:
             cls.deactivate(order, user)
             cls._cancel(order, user)
-        elif order.status in [Order.OrderStatus.CANCELED, Order.OrderStatus.ARCHIVED]:
+        elif order.status in [Order.OrderStatus.CANCELED, Order.OrderStatus.ARCHIVED, Order.OrderStatus.CONFIRMED]:
             logger.warning(f"Can't cancel order with status {order.status}. Order: {order} | {cls.__name__}")
             raise cls.ActionError()
         elif order.status == Order.OrderStatus.INACTIVE:
