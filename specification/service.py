@@ -1,5 +1,10 @@
 from typing import List, Dict
+from xml.dom import minidom
 
+import aiohttp
+import asyncio
+
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
@@ -7,11 +12,13 @@ import logging
 from django.db.models import OuterRef, Subquery, Exists, Sum, Min, IntegerField, F, Count, Q
 from django.db.models.functions import Cast
 
+from cella.models import File
 from cella.service import Operators
 from resources.models import ResourceCost, Resource, ResourceAction
 from resources.service import Resources
 from utils.function import resource_amounts
 from .models import Specification, SpecificationAction, SpecificationCategory, SpecificationResource
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +98,7 @@ class Specifications:
         return coefficient, action
 
     @classmethod
-    def set_price(cls, specification, price: float, user=None, save=True):
+    def set_price(cls, specification, price: float, user=None, save=True, send=False):
         specification = cls.get(specification)
         specification.price = price
         specification.verified = True
@@ -110,6 +117,9 @@ class Specifications:
             specification.save()
             action.save()
 
+        if send:
+            s_p = async_to_sync(cls.send_price)
+            s_p(specification.product_id, price)
         return price, action
 
     @classmethod
@@ -472,3 +482,39 @@ class Specifications:
         except DatabaseError as ex:
             logger.error(f"Error while building set. | {cls.__name__}", exc_info=True)
             raise cls.CantBuildSet()
+
+    @classmethod
+    async def send_price(cls, product_id, price):
+        return asyncio.create_task(send_price(product_id, price))
+
+    @classmethod
+    async def create_from_xml(cls, file_instance_id, operator_id):
+        print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        asyncio.create_task(upload_specifications(file_instance_id, operator_id))
+
+
+bitrix_url = settings.BITRIX_URL + "cella/test/"
+
+
+async def send_price(product_id, price):
+    async with aiohttp.ClientSession() as session:
+        await session.post(bitrix_url, data={"ID": product_id, "price": price})
+
+
+async def upload_specifications(file_instance_id, operator_id=None):
+    try:
+        file = await sync_to_async(File.objects.get)(id=file_instance_id)
+        tree = minidom.parse(file.file)
+        offers = tree.getElementsByTagName('offer')
+        specifications = []
+        for offer in offers:
+            obj = dict(
+                name=str(offer.getElementsByTagName('shop-sku')[0].childNodes[0].nodeValue),
+                product_id=str(offer.getElementsByTagName('market-sku')[0].childNodes[0].nodeValue),
+                price=float(offer.getElementsByTagName('price')[0].childNodes[0].nodeValue)
+            )
+            specification = Specification(**obj)
+            specifications.append(specification)
+        await sync_to_async(Specification.objects.bulk_create)(specifications)
+    except Exception:
+        logger.error("file read exception", exc_info=True)

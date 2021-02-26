@@ -14,16 +14,12 @@ class TestView(APIView):
     permission_classes = ()
     authentication_classes = ()
 
-    def get(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         logger.warning("WARNING")
         logger.debug("DEBUG")
         logger.info("INFO")
         logger.error("ERROR")
-        with transaction.atomic():
-            t1 = Test1.objects.create(test='ew', var=23)
-            t2 = Test2(tt='1', bb=2.3, v=t1)
-            t3 = Test2(tt='2', bb=4.2, v=t1)
-            a = [t2, t3]
-            Test2.objects.bulk_create(a)
+        print(request.data['ID'])
+        print(request.data['price'])
 
         return Response(data={"da": "yes"}, status=status.HTTP_200_OK)

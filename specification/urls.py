@@ -3,7 +3,8 @@ from django.urls import path
 from specification.views import SpecificationDetailView, SpecificationListView, SpecificationCategoryListView, \
     SpecificationCreateView, SpecificationCreateCategoryView, SpecificationEditView, SpecificationSetPriceView, \
     SpecificationSetCoefficientView, SpecificationAssembleInfoView, SpecificationBuildSetView, \
-    SpecificationSetCategoryView, SpecificationBulkDeleteView, SpecificationListShortView, SpecifiedVerifyPriceCount
+    SpecificationSetCategoryView, SpecificationBulkDeleteView, SpecificationListShortView, SpecifiedVerifyPriceCount, \
+    SpecificationXMLUploadView
 
 urlpatterns = [
     path('<int:s_id>/', SpecificationDetailView.as_view()),
@@ -20,4 +21,5 @@ urlpatterns = [
     path('delete/', SpecificationBulkDeleteView.as_view()),
     path('shortlist/', SpecificationListShortView.as_view()),
     path('virify-cost-amount/', SpecifiedVerifyPriceCount.as_view()),
+    path('upload/', SpecificationXMLUploadView.as_view())
 ]
