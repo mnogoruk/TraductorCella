@@ -133,6 +133,7 @@ class Resources:
 
             specifications = Specification.objects.filter(res_specs__resource=resource).annotate(
                 prime_cost=Subquery(query_res_spec.values('total_cost'))).values('product_id', 'prime_cost')
+            specifications = sync_to_async(specifications.all)
             spc = async_to_sync(cls.send_prime_cost)
 
             spc(specifications)
@@ -343,8 +344,8 @@ class Resources:
 
     @classmethod
     async def send_prime_cost(cls, products):
-        asyncio.create_task(send_prime_cost(products))
-        return
+        products = await products()
+        return asyncio.create_task(send_prime_cost(products))
 
 
 async def create_from_excel(file_instance_id, operator_id=None):
@@ -429,7 +430,19 @@ async def create_from_excel(file_instance_id, operator_id=None):
 bitrix_url = settings.BITRIX_URL + "cella/test/"
 
 
+def session_post(session, products, lnp):
+    i = 0
+    while i < lnp:
+        product = products[i]
+        i += 1
+        yield session.post(bitrix_url, data={"ID": product["product_id"], "primeCost": product['prime_cost']})
+
+
 async def send_prime_cost(products):
+    tasks = []
+    ln = sync_to_async(len)
+    lnp = await ln(products)
     async with aiohttp.ClientSession() as session:
-        for product in products:
-            await session.post(bitrix_url, data={"ID": product["product_id"], "primeCost": product['prime_cost']})
+        for sp in session_post(session, products, lnp):
+            tasks.append(sp)
+        await asyncio.gather(*tasks)

@@ -494,7 +494,6 @@ class Specifications:
 
     @classmethod
     async def create_from_xml(cls, file_instance_id, operator_id):
-        print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         asyncio.create_task(upload_specifications(file_instance_id, operator_id))
 
 

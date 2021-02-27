@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
 from order.service import Orders
-from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError
+from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 
@@ -144,6 +144,7 @@ class OrderManageActionView(APIView):
                     raise WrongParameterValue('action')
             except Orders.ActionError:
                 logger.warning(f"Manage action error for order with id: {order_id} | {self.__class__.__name__}")
+                raise StatusError()
             return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
         else:
             if order_id is None:

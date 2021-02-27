@@ -104,6 +104,7 @@ class ResourceListView(ListAPIView):
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name', 'id', 'provider__name']
+    ordering = 'name'
     ordering_fields = [
         'last_change_amount',
         'last_change_cost',
