@@ -193,9 +193,14 @@ class Specifications:
                 res_spec_ex=Exists(query_res_spec.values('id')),
                 needed_amount=Subquery(query_res_spec.values('amount')[:1]),
                 verified=Subquery(cost_qr.values('verified')[:1])).filter(res_spec_ex=True)
+            reses = []
+            prime_cost = 0
+            for resource in resources:
+                reses.append({'resource': resource, 'amount': resource.needed_amount})
+                prime_cost += resource.cost * resource.needed_amount
 
-            resources = [{'resource': resource, 'amount': resource.needed_amount} for resource in resources]
-            specification.resources = resources
+            specification.resources = reses
+            specification.prime_cost = prime_cost
             specification.available_to_assemble = cls.assemble_info(specification)
         except DatabaseError as ex:
             logger.error(f"Error while detail. | {cls.__name__}", exc_info=True)

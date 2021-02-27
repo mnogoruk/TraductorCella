@@ -61,6 +61,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
     verified = serializers.BooleanField(read_only=True, allow_null=True)
     amount = serializers.IntegerField(allow_null=True, required=False, default=0, min_value=0)
     available_to_assemble = serializers.IntegerField(read_only=True, allow_null=True)
+    prime_cost = serializers.DecimalField(max_digits=12, decimal_places=2, default=0, allow_null=True, read_only=True)
 
     def validate_resources_create(self, value):
         if len(value) == 0:
