@@ -1,6 +1,7 @@
 from typing import List, Dict
 import logging
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 from django.db.models import Count, Q
