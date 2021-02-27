@@ -3,6 +3,7 @@ import logging
 from django.http import Http404
 from rest_framework import status
 from rest_framework.authentication import BasicAuthentication
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import RetrieveAPIView, ListAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -33,8 +34,16 @@ class OrderDetailView(RetrieveAPIView):
 
 class OrderListView(ListAPIView):
     serializer_class = OrderSerializer
-    pagination_class = StandardResultsSetPagination
     permission_classes = [IsAuthenticated, DefaultPermission]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['external_id', 'id', 'source__name']
+    ordering = 'status'
+    ordering_fields = [
+        'external_id',
+        'source__name',
+        'status'
+    ]
 
     def get_queryset(self):
         try:

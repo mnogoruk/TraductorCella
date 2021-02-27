@@ -98,9 +98,8 @@ class ExpiredResourceCount(APIView):
 
 
 class ResourceListView(ListAPIView):
-    IsAuthenticated = [DefaultPermission]
     serializer_class = ResourceSerializer
-    permission_classes = [OfficeWorkerPermission, ]
+    permission_classes = [StorageWorkerPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name', 'id', 'provider__name']
