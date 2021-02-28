@@ -175,6 +175,14 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=14),
 }
 
+EMAIL_USE_TLS = True
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'smola.test01@gmail.com'
+EMAIL_HOST_PASSWORD = 'kjhgghjk007'
+DEFAULT_FROM_EMAIL = 'SMOLA'
+DEFAULT_TO_EMAIL = 'TeSt'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
