@@ -59,7 +59,7 @@ class SpecificationListView(ListAPIView):
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name', 'id', 'category__name']
-    ordering = 'name'
+    ordering = '-created_at'
     ordering_fields = [
         'name',
         'product_id',
