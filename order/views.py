@@ -36,14 +36,14 @@ class OrderListView(ListAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, DefaultPermission]
     pagination_class = StandardResultsSetPagination
-    filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ['external_id', 'id', 'source__name']
-    ordering = 'status'
-    ordering_fields = [
-        'external_id',
-        'source__name',
-        'status'
-    ]
+    # filter_backends = [SearchFilter, OrderingFilter]
+    # search_fields = ['external_id', 'id', 'source__name']
+    # ordering = 'status'
+    # ordering_fields = [
+    #     'external_id',
+    #     'source__name',
+    #     'status'
+    # ]
 
     def get_queryset(self):
         try:
