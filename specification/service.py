@@ -428,6 +428,8 @@ class Specifications:
                 min_amount = min(min_amount, int(res_spec.resource.amount / res_spec.amount))
         except ZeroDivisionError:
             logger.warning(f"Zero division error while finding assemble_info.  | {cls.__name__}", exc_info=True)
+        if min_amount is None:
+            return 0
         return min_amount
 
     @classmethod
