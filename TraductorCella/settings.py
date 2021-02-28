@@ -156,7 +156,8 @@ REST_FRAMEWORK = {
     # 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated']
 }
 
-BITRIX_URL = "http://127.0.0.1:8000/"
+BITRIX_URL = "https://smola20.art-clever.ru/"
+BITRIX_AUTH_CONF = {"login": "dev", "password": "123456"}
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),

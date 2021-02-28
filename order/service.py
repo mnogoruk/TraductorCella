@@ -435,9 +435,10 @@ class Orders:
         return asyncio.create_task(change_status(order_id, status))
 
 
-bitrix_url = settings.BITRIX_URL + "cella/test/"
+bitrix_url = settings.BITRIX_URL + "ajax/smenastatusa.php"
 
 
 async def change_status(order_id, status):
-    async with aiohttp.ClientSession() as session:
-        await session.post(bitrix_url, data={"ID": order_id, "status": status})
+    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUTH_CONF)) as session:
+        async with session.post(bitrix_url, data={"ID": order_id, "status": status}) as response:
+            print(response)

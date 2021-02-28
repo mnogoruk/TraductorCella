@@ -428,7 +428,7 @@ async def create_from_excel(file_instance_id, operator_id=None):
         raise Resources.CreateError()
 
 
-bitrix_url = settings.BITRIX_URL + "cella/test/"
+bitrix_url = settings.BITRIX_URL + "ajax/tsenaobnov.php "
 
 
 def session_post(session, products, lnp):
@@ -443,7 +443,7 @@ async def send_prime_cost(products):
     tasks = []
     ln = sync_to_async(len)
     lnp = await ln(products)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUTH_CONF)) as session:
         for sp in session_post(session, products, lnp):
             tasks.append(sp)
         await asyncio.gather(*tasks)
