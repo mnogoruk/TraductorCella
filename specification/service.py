@@ -60,7 +60,7 @@ class Specifications:
 
     @classmethod
     def shortlist(cls):
-        return Specification.objects.all()
+        return Specification.objects.order_by('name').all()
 
     @classmethod
     def get_category(cls, category):
@@ -494,7 +494,6 @@ class Specifications:
 
     @classmethod
     async def create_from_xml(cls, file_instance_id, operator_id):
-        print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
         asyncio.create_task(upload_specifications(file_instance_id, operator_id))
 
 

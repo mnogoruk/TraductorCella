@@ -22,7 +22,6 @@ class TestView(APIView):
         logger.debug("DEBUG")
         logger.info("INFO")
         logger.error("ERROR")
-        print(request.data['ID'])
-        print(request.data['price'])
+        print(request.data)
 
         return Response(data={"da": "yes"}, status=status.HTTP_200_OK)

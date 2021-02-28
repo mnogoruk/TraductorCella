@@ -87,3 +87,9 @@ class AssembleError(APIException):
     status_code = 400
     default_code = 'bad_request'
     default_detail = 'Assembling error'
+
+
+class StatusError(APIException):
+    status_code = 400
+    default_code = 'bad_request'
+    default_detail = 'Status error'

@@ -1,6 +1,10 @@
+import asyncio
 from typing import List, Dict
 import logging
 
+import aiohttp
+from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 from django.db.models import Count, Q
@@ -131,7 +135,8 @@ class Orders:
         specification = Specifications.get(specification)
 
         if not (order.status == Order.OrderStatus.ACTIVE or order.status == Order.OrderStatus.ASSEMBLING):
-            logger.warning(f"Can't assemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
+            logger.warning(
+                f"Can't assemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
             raise cls.AssembleError()
 
         operator = Operators.get_operator(user)
@@ -205,6 +210,9 @@ class Orders:
                 raise cls.ActionError()
             cls._confirm(order, Operators.get_operator(user))
             order.save()
+
+            ch_s = async_to_sync(cls.change_status)
+            ch_s(order.external_id, 'DF')
         except Exception:
             logger.warning("")
             raise cls.ActionError()
@@ -238,33 +246,39 @@ class Orders:
 
         order_specs = order.order_specification
         operator = Operators.get_operator(user)
+
         try:
-            for order_spec in order_specs.all():
-                specification = order_spec.specification
-                res_specs = specification.res_specs
+            with transaction.atomic():
+                for order_spec in order_specs.all():
+                    specification = order_spec.specification
+                    res_specs = specification.res_specs
 
-                if specification.amount > order_spec.amount:
-                    Specifications.set_amount(specification, specification.amount - order_spec.amount, operator)
-                    continue
-
-                else:
-                    storage_amount = specification.amount
-                    Specifications.set_amount(specification, 0, operator, False)
-
-                for res_spec in res_specs.all():
-                    resource = res_spec.resource
-                    amount = resource.amount
-                    if amount >= res_spec.amount * (order_spec.amount - storage_amount):
-                        Resources.change_amount(resource, - (res_spec.amount * (order_spec.amount - storage_amount)),
-                                                operator)
+                    if specification.amount > order_spec.amount:
+                        Specifications.set_amount(specification, specification.amount - order_spec.amount, operator)
+                        continue
 
                     else:
-                        raise cls.ActionError(f"resource {resource.name}, amount {amount}")
+                        storage_amount = specification.amount
+                        Specifications.set_amount(specification, 0, operator, False)
 
-                specification.save()
+                    for res_spec in res_specs.all():
+                        resource = res_spec.resource
+                        amount = resource.amount
+                        if amount >= res_spec.amount * (order_spec.amount - storage_amount):
+                            Resources.change_amount(resource,
+                                                    - (res_spec.amount * (order_spec.amount - storage_amount)),
+                                                    operator)
 
-            cls._activate(order, Operators.get_operator(user))
-            order.save()
+                        else:
+                            logger.warning(f"Can`t assemble Order. Not enough resources")
+                            raise cls.ActionError(f"resource {resource.name}, amount {amount}")
+
+                    specification.save()
+
+                cls._activate(order, Operators.get_operator(user))
+                order.save()
+            ch_s = async_to_sync(cls.change_status)
+            ch_s(order.external_id, 'S')
         except DatabaseError:
             logger.warning(f"Activation error. Order: {order} | {cls.__name__}", exc_info=True)
             raise cls.ActionError()
@@ -293,6 +307,9 @@ class Orders:
 
             cls._deactivate(order, Operators.get_operator(user))
             order.save()
+
+            ch_s = async_to_sync(cls.change_status)
+            ch_s(order.external_id, 'P')
         except DatabaseError:
             logger.warning(f"Can't deactivate order. Order: {order} | {cls.__name__}", exc_info=True)
             raise cls.ActionError()
@@ -412,3 +429,15 @@ class Orders:
             action_type=OrderAction.ActionType.CANCEL,
             operator=operator,
         )
+
+    @classmethod
+    async def change_status(cls, order_id, status):
+        return asyncio.create_task(change_status(order_id, status))
+
+
+bitrix_url = settings.BITRIX_URL + "cella/test/"
+
+
+async def change_status(order_id, status):
+    async with aiohttp.ClientSession() as session:
+        await session.post(bitrix_url, data={"ID": order_id, "status": status})

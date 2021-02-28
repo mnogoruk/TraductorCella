@@ -1,6 +1,7 @@
 from asgiref.sync import async_to_sync
 from django.http import Http404
 from rest_framework import status
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, RetrieveUpdateAPIView
 from logging import getLogger
 
@@ -54,8 +55,20 @@ class SpecificationDetailView(RetrieveAPIView):
 
 class SpecificationListView(ListAPIView):
     serializer_class = SpecificationListSerializer
-    pagination_class = StandardResultsSetPagination
     permission_classes = [IsAuthenticated, DefaultPermission]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['name', 'id', 'category__name']
+    ordering = '-created_at'
+    ordering_fields = [
+        'name',
+        'product_id',
+        'category__name',
+        'price',
+        'amount',
+        'prime_cost',
+        'verified'
+    ]
 
     def get_queryset(self):
         try:

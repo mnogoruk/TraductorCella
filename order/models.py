@@ -35,6 +35,7 @@ class OrderSpecification(models.Model):
     specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='order_specification')
     amount = models.IntegerField()
     assembled = models.BooleanField(default=False)
+    # created_at = models.DateTimeField(auto_now_add=True)
 
 
 class OrderAction(models.Model):
