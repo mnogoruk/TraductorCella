@@ -38,7 +38,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = ['role', 'password', 'username']
 
     def create(self, validated_data):
-        print(validated_data)
         password = create_password()
         username = create_username(validated_data['role'])
         account = Account.objects.create_user(
@@ -49,8 +48,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
         account.username = username
         account.password = password
-        print(username)
-        print(password)
         print(send_mail('Subject', f'username: {username}\npassword: {password}', 'smola-test@mail.ru',
                         ['smola-test@mail.ru'], fail_silently=False))
         return account
