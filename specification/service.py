@@ -60,7 +60,7 @@ class Specifications:
 
     @classmethod
     def shortlist(cls):
-        return Specification.objects.all()
+        return Specification.objects.order_by('name').all()
 
     @classmethod
     def get_category(cls, category):

@@ -283,7 +283,7 @@ class Resources:
     @classmethod
     def shortlist(cls):
         query_cost = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
-        query = Resource.objects.select_related('provider').annotate(cost=Subquery(query_cost.values('value')[:1]))
+        query = Resource.objects.select_related('provider').filter('name').annotate(cost=Subquery(query_cost.values('value')[:1]))
         return query
 
     @classmethod

@@ -1,4 +1,5 @@
 import uuid
+from datetime import time
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin, User
@@ -88,7 +89,7 @@ class Account(AbstractBaseUser, PermissionsMixin):
     verified = models.BooleanField(default=False)
     verifying_slug = models.SlugField(default=uuid.uuid4, editable=False, unique=True)
     role = models.IntegerField(choices=RoleChoice.choices, default=RoleChoice.DEFAULT)
-
+    created_at = models.DateTimeField(auto_now_add=True)
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = []
 
