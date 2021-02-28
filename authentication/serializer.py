@@ -1,6 +1,7 @@
 import secrets
 import string
 
+from django.core.mail import send_mail
 from rest_framework import serializers
 from .models import Account
 
@@ -48,6 +49,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
         account.username = username
         account.password = password
+        print(username)
+        print(password)
+        print(send_mail('Subject', f'username: {username}\npassword: {password}', 'smola-test@mail.ru',
+                        ['smola-test@mail.ru'], fail_silently=False))
         return account
 
 
