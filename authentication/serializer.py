@@ -1,11 +1,15 @@
+import logging
 import secrets
 import string
 
 from django.core.mail import send_mail
 from rest_framework import serializers
+
+from utils.exception import CreationError, UpdateError
 from .models import Account
 
 alphabet = string.ascii_letters + string.digits
+logger = logging.getLogger(__name__)
 
 
 def get_role_name(role):
@@ -32,27 +36,36 @@ def create_username(role):
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(max_length=100, read_only=True)
     username = serializers.CharField(max_length=100, read_only=True)
+    email = serializers.EmailField(max_length=200)
 
     class Meta:
         model = Account
-        fields = ['role', 'password', 'username']
+        fields = ['role', 'password', 'username', 'email']
 
     def create(self, validated_data):
-        print(validated_data)
         password = create_password()
         username = create_username(validated_data['role'])
-        account = Account.objects.create_user(
-            username=username,
-            password=password,
-            role=validated_data['role']
-        )
-
+        email = validated_data['email']
+        try:
+            account = Account.objects.create_user(
+                username=username,
+                password=password,
+                role=validated_data['role'],
+                email=email
+            )
+        except Exception as ex:
+            logger.error(f"Error while creating user. username={username}, role={validated_data['role']}, email={email}", exc_info=True)
+            raise CreationError()
         account.username = username
         account.password = password
-        print(username)
-        print(password)
-        print(send_mail('Subject', f'username: {username}\npassword: {password}', 'smola-test@mail.ru',
-                        ['smola-test@mail.ru'], fail_silently=False))
+        try:
+            print(send_mail('Subject', f'логин и пароль для smola20.ru\nusername: {username}\npassword: {password}',
+                            'smola20service@gmail.com',
+                            [email], fail_silently=False))
+            logger.info(f"sent email to {email}")
+        except Exception as ex:
+            logger.error(f"Error while sending email email={email}, username={username}", exc_info=True)
+        logger.info(f"Successfully created user: {username}, {email}")
         return account
 
 
@@ -63,7 +76,11 @@ class UserEditSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         instance.verified = True
-        return super().update(instance, validated_data)
+        try:
+            return super().update(instance, validated_data)
+        except Exception as ex:
+            logger.error(f"error while updating user info. vd: {validated_data}")
+            raise UpdateError()
 
 
 class UserSerializer(serializers.ModelSerializer):

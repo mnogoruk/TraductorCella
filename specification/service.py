@@ -500,12 +500,14 @@ class Specifications:
         asyncio.create_task(upload_specifications(file_instance_id, operator_id))
 
 
-bitrix_url = settings.BITRIX_URL + "cella/test/"
+bitrix_url = settings.BITRIX_URL + "ajax/tsenaobnov.php"
 
 
 async def send_price(product_id, price):
-    async with aiohttp.ClientSession() as session:
-        await session.post(bitrix_url, data={"ID": product_id, "price": price})
+    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUF_CONF)) as session:
+        print({"ID": product_id, "price": price})
+        async with session.post(bitrix_url, json={"ID": product_id, "price": price}, verify_ssl=False) as response:
+            print(response)
 
 
 async def upload_specifications(file_instance_id, operator_id=None):

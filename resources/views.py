@@ -102,7 +102,7 @@ class ResourceListView(ListAPIView):
     permission_classes = [StorageWorkerPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ['name', 'id', 'provider__name']
+    search_fields = ['name', 'id', 'provider__name', 'external_id']
     ordering = '-created_at'
     ordering_fields = [
         'last_change_amount',
@@ -111,7 +111,9 @@ class ResourceListView(ListAPIView):
         'external_id',
         'provider__name',
         'cost',
-        'amount'
+        'amount',
+        'amount_limit',
+        'created_at'
     ]
 
     def get_queryset(self):

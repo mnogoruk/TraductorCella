@@ -14,7 +14,7 @@ class SpecificationCategory(models.Model):
 
 
 class Specification(models.Model):
-    name = models.CharField(max_length=400)
+    name = models.CharField(max_length=400, null=True)
     product_id = models.CharField(max_length=50)
     category = models.ForeignKey(SpecificationCategory,
                                  on_delete=models.SET_NULL,

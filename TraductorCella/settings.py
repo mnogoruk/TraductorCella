@@ -145,7 +145,8 @@ REST_FRAMEWORK = {
     # 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated']
 }
 
-BITRIX_URL = "http://127.0.0.1:8000/"
+BITRIX_URL = "https://smola20.art-clever.ru/"
+BITRIX_AUF_CONF = {"login": "dev", "password": "123456"}
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
@@ -178,10 +179,9 @@ SIMPLE_JWT = {
 EMAIL_USE_TLS = True
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'smola.test01@gmail.com'
-EMAIL_HOST_PASSWORD = 'kjhgghjk007'
-DEFAULT_FROM_EMAIL = 'SMOLA'
-DEFAULT_TO_EMAIL = 'TeSt'
+EMAIL_HOST_USER = 'smola20service@gmail.com'
+EMAIL_HOST_PASSWORD = 'a491w2hy2qtizj1q'
+DEFAULT_FROM_EMAIL = 'smola20service@gmail.com'
 
 LOGGING = {
     'version': 1,
