@@ -51,7 +51,7 @@ class Specifications:
         if not isinstance(specification, Specification):
             try:
                 return Specification.objects.select_related(*related).prefetch_related(*prefetched).get(
-                    id=specification, is_active=True)
+                    id=specification)
             except DatabaseError:
                 logger.warning(f"Specification does not exist. Id: '{specification}' | {cls.__name__}", exc_in=True)
                 raise cls.DoesNotExist()
@@ -291,11 +291,12 @@ class Specifications:
                         res = resource['resource']
                         res.cost = res.resourcecost_set.last().value
 
-                        SpecificationResource.objects.create(
+                        s = SpecificationResource.objects.create(
                             resource=res,
                             amount=resource['amount'],
                             specification=specification
                         )
+                        print(s.amount)
 
                         specification.resources = res_specs_dict
 
