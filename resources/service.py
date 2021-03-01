@@ -196,7 +196,7 @@ class Resources:
 
     @classmethod
     def create(cls, resource_name: str, external_id: str, cost_value: float = 0, amount_value: float = 0,
-               provider_name: str = None, user=None):
+               provider_name: str = None, storage_place=None, user=None):
 
         if cost_value is None:
             cost_value = .0
@@ -216,7 +216,8 @@ class Resources:
                     resource = Resource.objects.create(name=resource_name,
                                                        external_id=external_id,
                                                        provider=provider,
-                                                       amount=amount_value)
+                                                       amount=amount_value,
+                                                       storage_place=storage_place)
 
                 except IntegrityError:
                     logger.warning(f"Not unique external id '{external_id}'")
@@ -433,17 +434,23 @@ bitrix_url = settings.BITRIX_URL + "ajax/tsenaobnov.php "
 
 def session_post(session, products, lnp):
     i = 0
+    headers = {'content-type': 'application/json'}
     while i < lnp:
         product = products[i]
+        logger.info(f"sent prime cost {product}")
         i += 1
-        yield session.post(bitrix_url, data={"ID": product["product_id"], "primeCost": product['prime_cost']})
+        yield session.post(bitrix_url, json={"ID": product["product_id"], "primeCost": product['prime_cost']},
+                           headers=headers)
 
 
 async def send_prime_cost(products):
     tasks = []
     ln = sync_to_async(len)
     lnp = await ln(products)
-    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUTH_CONF)) as session:
+    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUF_CONF)) as session:
         for sp in session_post(session, products, lnp):
             tasks.append(sp)
-        await asyncio.gather(*tasks)
+        try:
+            await asyncio.gather(*tasks)
+        except Exception as ex:
+            logger.error(f"error while sending products new prime_cost", exc_info=True)

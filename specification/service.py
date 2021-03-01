@@ -232,6 +232,7 @@ class Specifications:
     @classmethod
     def create(cls, name: str, product_id: str, price: float = None, coefficient: float = None,
                resources: List[Dict[str, str]] = None, category_name: str = None, amount: int = None,
+               storage_place=None,
                user=None):
 
         try:
@@ -257,7 +258,8 @@ class Specifications:
                 specification = Specification.objects.create(
                     name=name,
                     product_id=product_id,
-                    is_active=True)
+                    is_active=True,
+                    storage_place=storage_place)
 
                 actions = []
 
@@ -504,9 +506,13 @@ bitrix_url = settings.BITRIX_URL + "ajax/tsenaobnov.php"
 
 
 async def send_price(product_id, price):
-    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUTH_CONF)) as session:
-        async with (session.post(bitrix_url, data={"ID": product_id, "price": price})) as response:
-            print(response)
+    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUF_CONF)) as session:
+        logger.info(f"sending new price {price} for product {product_id}")
+        try:
+            await session.post(bitrix_url, json={"ID": product_id, "price": price}, verify_ssl=False)
+        except Exception as ex:
+            logger.error(f"Error while post send_price", exc_info=True)
+
 
 
 async def upload_specifications(file_instance_id, operator_id=None):

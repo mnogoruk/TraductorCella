@@ -336,8 +336,13 @@ class Orders:
 
                 if products is not None and len(products) != 0:
                     order_specs = []
-                    specifications_objects = Specification.objects.filter(
-                        product_id__in=map(lambda x: x['product_id'], products), is_active=True)
+                    specifications_objects = []
+                    for product in products:
+                        specification = Specification.objects.get_or_create(product_id=product['product_id'],
+                                                                            is_active=True)[0]
+                        specifications_objects.append(specification)
+                    # specifications_objects = Specification.objects.filter(
+                    #     product_id__in=map(lambda x: x['product_id'], products), is_active=True)
                     order_specs_dict = product_amounts(specifications_objects, products)
 
                     for product in order_specs_dict:
@@ -439,6 +444,12 @@ bitrix_url = settings.BITRIX_URL + "ajax/smenastatusa.php"
 
 
 async def change_status(order_id, status):
-    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUTH_CONF)) as session:
-        async with session.post(bitrix_url, data={"ID": order_id, "status": status}) as response:
-            print(response)
+
+    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUF_CONF)) as session:
+        logger.info(f"send changed status. id: {order_id}, status: {status}")
+        headers = {'content-type': 'application/json'}
+        try:
+            await session.post(bitrix_url, json={"ID": order_id, "status": status}, headers=headers)
+        except Exception as ex:
+            logger.error("Error while posting new status", exc_info=True)
+

@@ -45,6 +45,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     last_change_cost = serializers.DateTimeField(read_only=True)
     last_change_amount = serializers.DateTimeField(read_only=True)
     verified = serializers.BooleanField(allow_null=True, read_only=True)
+    storage_place = serializers.CharField(allow_null=True, required=False)
 
     def create(self, validated_data):
         resource = Resources.create(
@@ -53,6 +54,7 @@ class ResourceSerializer(serializers.ModelSerializer):
             cost_value=validated_data.get('cost'),
             amount_value=validated_data.get('amount'),
             provider_name=validated_data.get('provider_name'),
+            storage_place=validated_data.get('storage_place'),
             user=validated_data.get('request').user
         )
         return resource
@@ -95,6 +97,7 @@ class ResourceSerializer(serializers.ModelSerializer):
             'cost',
             'amount',
             'amount_limit',
+            'storage_place'
             'last_change_amount',
             'last_change_cost',
             'verified']

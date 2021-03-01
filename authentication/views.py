@@ -39,7 +39,7 @@ class UserListView(ListAPIView):
     permission_classes = (IsAuthenticated, AdminPermission)
 
     def get_queryset(self):
-        accounts = Account.objects.exclude(id=self.request.user.id)
+        accounts = Account.objects.exclude(id=self.request.user.id, username='bitrix')
         return accounts
 
 
@@ -48,8 +48,12 @@ class UserChangePasswordView(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        password = request.data['password']
-        user.set_password(password)
+        old_password = request.data['old_password']
+        if not request.user.check_password(old_password):
+            logger.warning(f"Incorrect password for user: {user.username}")
+            return Response(data={"old_password": "Incorrect password"}, status=status.HTTP_400_BAD_REQUEST)
+        new_password = request.data['password']
+        user.set_password(new_password)
         user.save()
         return Response(data={'correct': True}, status=status.HTTP_200_OK)
 

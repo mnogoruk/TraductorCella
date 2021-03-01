@@ -14,7 +14,7 @@ class SpecificationCategory(models.Model):
 
 
 class Specification(models.Model):
-    name = models.CharField(max_length=400)
+    name = models.CharField(max_length=400, null=True)
     product_id = models.CharField(max_length=50)
     category = models.ForeignKey(SpecificationCategory,
                                  on_delete=models.SET_NULL,
@@ -27,6 +27,7 @@ class Specification(models.Model):
     coefficient = models.DecimalField(max_digits=12, decimal_places=2, default=None, null=True)
     verified = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    storage_place = models.CharField(max_length=100, null=True)
 
     def __str__(self):
         return f"{self.name}"

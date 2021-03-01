@@ -62,6 +62,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
     amount = serializers.IntegerField(allow_null=True, required=False, default=0, min_value=0)
     available_to_assemble = serializers.IntegerField(read_only=True, allow_null=True)
     prime_cost = serializers.DecimalField(max_digits=12, decimal_places=2, default=0, allow_null=True, read_only=True)
+    storage_place = serializers.CharField(allow_null=True, required=False)
 
     def validate_resources_create(self, value):
         if len(value) == 0:
@@ -79,7 +80,6 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def create(self, validated_data):
-        # print(validated_data['resources_create'])
         spec = Specifications.create(
             name=validated_data['name'],
             product_id=validated_data['product_id'],
@@ -88,6 +88,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             resources=validated_data['resources_create'],
             category_name=validated_data['category_name'],
             amount=validated_data['amount'],
+            storage_place=validated_data['storage_place'],
             user=validated_data['request'].user
         )
         return spec
