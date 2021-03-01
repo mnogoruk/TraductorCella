@@ -196,7 +196,7 @@ class Resources:
 
     @classmethod
     def create(cls, resource_name: str, external_id: str, cost_value: float = 0, amount_value: float = 0,
-               provider_name: str = None, user=None):
+               provider_name: str = None, storage_place=None, user=None):
 
         if cost_value is None:
             cost_value = .0
@@ -216,7 +216,8 @@ class Resources:
                     resource = Resource.objects.create(name=resource_name,
                                                        external_id=external_id,
                                                        provider=provider,
-                                                       amount=amount_value)
+                                                       amount=amount_value,
+                                                       storage_place=storage_place)
 
                 except IntegrityError:
                     logger.warning(f"Not unique external id '{external_id}'")

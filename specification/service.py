@@ -232,6 +232,7 @@ class Specifications:
     @classmethod
     def create(cls, name: str, product_id: str, price: float = None, coefficient: float = None,
                resources: List[Dict[str, str]] = None, category_name: str = None, amount: int = None,
+               storage_place=None,
                user=None):
 
         try:
@@ -257,7 +258,8 @@ class Specifications:
                 specification = Specification.objects.create(
                     name=name,
                     product_id=product_id,
-                    is_active=True)
+                    is_active=True,
+                    storage_place=storage_place)
 
                 actions = []
 
