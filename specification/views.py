@@ -84,6 +84,7 @@ class SpecificationCreateView(CreateAPIView):
 
     def perform_create(self, serializer):
         try:
+            print(serializer.validated_data)
             return serializer.save(request=self.request)
         except Specifications.QueryError:
             logger.warning(f"Create error | {self.__class__.__name__}", exc_info=True)

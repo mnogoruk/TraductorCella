@@ -79,6 +79,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def create(self, validated_data):
+        # print(validated_data['resources_create'])
         spec = Specifications.create(
             name=validated_data['name'],
             product_id=validated_data['product_id'],
