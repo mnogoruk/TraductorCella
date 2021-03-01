@@ -97,7 +97,7 @@ class ResourceSerializer(serializers.ModelSerializer):
             'cost',
             'amount',
             'amount_limit',
-            'storage_place'
+            'storage_place',
             'last_change_amount',
             'last_change_cost',
             'verified']
