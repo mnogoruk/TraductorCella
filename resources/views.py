@@ -178,6 +178,31 @@ class ResourceSetCostView(APIView):
             raise NoParameterSpecified()
 
 
+class ResourceSetAmount(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+
+    def post(self, request, *args, **keargs):
+        data = request.data
+        try:
+            r_id = data['id']
+        except KeyError as ex:
+            logger.warning(f"'id' not specified | {self.__class__.__name__}")
+            raise NoParameterSpecified('id')
+        try:
+            amount = float(data['amount'])
+        except KeyError as ex:
+            logger.warning(f"'amount' not specified | {self.__class__.__name__}")
+            raise NoParameterSpecified('amount')
+        except TypeError as ex:
+            logger.warning(f"'amount' wrong type | {self.__class__.__name__}")
+            WrongParameterType('cost', 'float')
+        try:
+            amount, _ = Resources.set_amount(r_id, amount, user=request.user)
+        except Resources.UpdateError:
+            logger.warning(f"Update error | {self.__class__.__name__}", exc_info=True)
+            raise UpdateError()
+        return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
+
 class ResourceAddAmountView(APIView):
     permission_classes = [IsAuthenticated, StorageWorkerPermission]
 

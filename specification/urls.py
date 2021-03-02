@@ -4,7 +4,7 @@ from specification.views import SpecificationDetailView, SpecificationListView, 
     SpecificationCreateView, SpecificationCreateCategoryView, SpecificationEditView, SpecificationSetPriceView, \
     SpecificationSetCoefficientView, SpecificationAssembleInfoView, SpecificationBuildSetView, \
     SpecificationSetCategoryView, SpecificationBulkDeleteView, SpecificationListShortView, SpecifiedVerifyPriceCount, \
-    SpecificationXMLUploadView
+    SpecificationXMLUploadView, SpecificationSetAmountView
 
 urlpatterns = [
     path('<int:s_id>/', SpecificationDetailView.as_view()),
@@ -16,6 +16,7 @@ urlpatterns = [
     path('set-price/', SpecificationSetPriceView.as_view()),
     path('set-coefficient/', SpecificationSetCoefficientView.as_view()),
     path('assemble-info/<int:s_id>/', SpecificationAssembleInfoView.as_view()),
+    path('set-amount/', SpecificationSetAmountView.as_view()),
     path('build-set/', SpecificationBuildSetView.as_view()),
     path('set-category/', SpecificationSetCategoryView.as_view()),
     path('delete/', SpecificationBulkDeleteView.as_view()),

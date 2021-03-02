@@ -144,6 +144,34 @@ class SpecificationSetPriceView(APIView):
             raise NoParameterSpecified()
 
 
+class SpecificationSetAmountView(APIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        try:
+            s_id = data['id']
+        except KeyError as ex:
+            logger.warning(f"'id' not specified | {self.__class__.__name__}", exc_info=True)
+            raise NoParameterSpecified('id')
+        try:
+            value = float(data['amount'])
+        except KeyError as ex:
+            logger.warning(f"'amount' not specified | {self.__class__.__name__}", exc_info=True)
+            raise NoParameterSpecified('amount')
+        except TypeError as ex:
+            logger.warning(f"'amount' wrong type", exc_info=True)
+            raise WrongParameterType('amount', 'float')
+        if value is not None and s_id is not None:
+            try:
+                Specifications.set_amount(specification=s_id, amount=value, user=request.user)
+            except Specifications.EditError:
+                logger.warning(f"Set amount error | {self.__class__.__name__}", exc_info=True)
+            return Response(data={'id': s_id, 'amount': value}, status=status.HTTP_202_ACCEPTED)
+        else:
+            raise NoParameterSpecified()
+
+
 class SpecificationSetCoefficientView(APIView):
     permission_classes = [IsAuthenticated, AdminPermission]
 
@@ -155,13 +183,12 @@ class SpecificationSetCoefficientView(APIView):
             logger.warning(f"'id' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('id')
         try:
-            logger.warning(f"'coefficient' not specified | {self.__class__.__name__}", exc_info=True)
             value = float(data['coefficient'])
         except KeyError as ex:
             logger.warning(f"'coefficient' not specified | {self.__class__.__name__}", exc_info=True)
             raise NoParameterSpecified('coefficient')
         except TypeError as ex:
-            logger.warning(f"'coefficient' wrong type")
+            logger.warning(f"'coefficient' wrong type", exc_info=True)
             raise WrongParameterType('coefficient', 'float')
         if value is not None and s_id is not None:
             try:
