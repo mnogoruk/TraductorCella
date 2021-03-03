@@ -8,7 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# Resources
 class TestView(APIView):
     permission_classes = (IsAuthenticated,)
 
