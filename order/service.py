@@ -130,7 +130,7 @@ class Orders:
         if order.status in [Order.OrderStatus.INACTIVE]:
             m, n = cls.assembling_info(order)
         else:
-            m = [],
+            m = []
             n = []
         order.missing_resources = n
         order.missing_specifications = m
