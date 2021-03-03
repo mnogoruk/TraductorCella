@@ -66,8 +66,17 @@ class Orders:
                 Order.OrderStatus.ARCHIVED
             ]
         ).order_by('status')
+
+        return orders
+
+    @classmethod
+    def add_assembling_info(cls, orders):
         for order in orders:
-            m, n = cls.assembling_info(order)
+            if order.status in [Order.OrderStatus.INACTIVE]:
+                m, n = cls.assembling_info(order)
+            else:
+                m = 0
+                n = 0
             order.missing_resources = n
             order.missing_specifications = m
         return orders

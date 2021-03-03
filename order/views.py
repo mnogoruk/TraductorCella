@@ -3,6 +3,7 @@ import logging
 from django.http import Http404
 from rest_framework import status
 from rest_framework.authentication import BasicAuthentication
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import RetrieveAPIView, ListAPIView, CreateAPIView
 from rest_framework.response import Response
@@ -10,7 +11,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
 from order.service import Orders
-from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError
+from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError, \
+    AssembleError
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 
@@ -36,14 +38,16 @@ class OrderListView(ListAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, DefaultPermission]
     pagination_class = StandardResultsSetPagination
-    # filter_backends = [SearchFilter, OrderingFilter]
-    # search_fields = ['external_id', 'id', 'source__name']
-    # ordering = 'status'
-    # ordering_fields = [
-    #     'external_id',
-    #     'source__name',
-    #     'status'
-    # ]
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    filterset_fields = ['status']
+    search_fields = ['external_id', 'id', 'source__name']
+    ordering = 'status'
+    ordering_fields = [
+        'external_id',
+        'source__name',
+        'status',
+        'created_at'
+    ]
 
     def get_queryset(self):
         try:
@@ -51,6 +55,18 @@ class OrderListView(ListAPIView):
         except Orders.QueryError:
             logger.warning(f"Queryset error | {self.__class__.__name__}", exc_info=True)
             raise QueryError()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            page = Orders.add_assembling_info(page)
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class OrderAssembleSpecificationView(APIView):
@@ -78,6 +94,7 @@ class OrderAssembleSpecificationView(APIView):
                 logger.warning(
                     f"Assemble info. Specification id: {specification_id}, order id: {order_id} | "
                     f"{self.__class__.__name__}", exc_info=True)
+                raise AssembleError()
         else:
             if order_id is None:
                 logger.warning(f"order id is not specified | {self.__class__.__name__}")

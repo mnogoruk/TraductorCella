@@ -88,7 +88,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             resources=validated_data['resources_create'],
             category_name=validated_data['category_name'],
             amount=validated_data['amount'],
-            storage_place=validated_data['storage_place'],
+            storage_place=validated_data.get('storage_place'),
             user=validated_data['request'].user
         )
         return spec
