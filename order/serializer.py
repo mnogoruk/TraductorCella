@@ -113,7 +113,6 @@ class OrderGetSerializer(serializers.ModelSerializer):
             return specs
 
     def create(self, validated_data):
-        print(validated_data)
         order = Orders.create(
             external_id=validated_data['ID'],
             source="Bitrix",

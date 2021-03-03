@@ -20,6 +20,6 @@ urlpatterns = [
     path('set-category/', SpecificationSetCategoryView.as_view()),
     path('delete/', SpecificationBulkDeleteView.as_view()),
     path('shortlist/', SpecificationListShortView.as_view()),
-    path('virify-cost-amount/', SpecifiedVerifyPriceCount.as_view()),
+    path('verify-price-amount/', SpecifiedVerifyPriceCount.as_view()),
     path('upload/', SpecificationXMLUploadView.as_view())
 ]
