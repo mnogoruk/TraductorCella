@@ -1,21 +1,16 @@
-import logging
-
-from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 import logging
-from .models import Test1, Test2
-from rest_framework.authentication import BasicAuthentication
-from cella.models import Test1, Test2
+
 
 logger = logging.getLogger(__name__)
 
 
 # Resources
 class TestView(APIView):
-    permission_classes = ()
-    authentication_classes = ()
+    permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
         logger.warning("WARNING")
