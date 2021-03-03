@@ -127,7 +127,11 @@ class Orders:
             'order_specification__specification__res_specs__resource',
             'order_specification__specification__res_specs__resource__resourcecost_set'
         ).get(id=order)
-        m, n = cls.assembling_info(order)
+        if order.status in [Order.OrderStatus.INACTIVE]:
+            m, n = cls.assembling_info(order)
+        else:
+            m = [],
+            n = []
         order.missing_resources = n
         order.missing_specifications = m
 
@@ -453,7 +457,6 @@ bitrix_url = settings.BITRIX_URL + "ajax/smenastatusa.php"
 
 
 async def change_status(order_id, status):
-
     async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUF_CONF)) as session:
         logger.info(f"send changed status. id: {order_id}, status: {status}")
         headers = {'content-type': 'application/json'}
@@ -461,4 +464,3 @@ async def change_status(order_id, status):
             await session.post(bitrix_url, json={"ID": order_id, "status": status}, headers=headers)
         except Exception as ex:
             logger.error("Error while posting new status", exc_info=True)
-
