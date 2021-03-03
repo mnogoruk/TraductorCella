@@ -440,7 +440,7 @@ def session_post(session, products, lnp):
         product = products[i]
         logger.info(f"sent prime cost {product}")
         i += 1
-        yield session.post(bitrix_url, json={"ID": product["product_id"], "primeCost": product['prime_cost']},
+        yield session.post(bitrix_url, json={"ID": str(product["product_id"]), "primeCost": float(product['prime_cost'])},
                            headers=headers)
 
 
