@@ -72,7 +72,6 @@ class Resources:
 
         return amount_value, action
 
-
     @classmethod
     def change_amount(cls, resource, delta_amount, user=None, save=True):
         resource = cls.get(resource)

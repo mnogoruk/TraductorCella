@@ -63,3 +63,11 @@ class ResourceAction(models.Model):
 
     def __str__(self):
         return f"{self.action_type} for {self.resource}"
+
+
+class ResourceSupply(models.Model):
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='resource_supplies')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    cost = models.DecimalField(max_digits=12, decimal_places=2)
+    time_stamp = models.DateField()
+    provider = models.ForeignKey(ResourceProvider, on_delete=models.CASCADE, related_name='resource_supplies')

@@ -13,7 +13,7 @@ from cella.serializer import FileSerializer
 from cella.service import Operators
 from resources.models import Resource
 from resources.serializer import ResourceSerializer, ResourceWithUnverifiedCostSerializer, ResourceActionSerializer, \
-    ResourceShortSerializer, ResourceProviderSerializer
+    ResourceShortSerializer, ResourceProviderSerializer, ResourceSupplySerializer
 from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError, WrongParameterType
@@ -203,6 +203,7 @@ class ResourceSetAmount(APIView):
             raise UpdateError()
         return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
 
+
 class ResourceAddAmountView(APIView):
     permission_classes = [IsAuthenticated, StorageWorkerPermission]
 
@@ -229,6 +230,7 @@ class ResourceAddAmountView(APIView):
         return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
 
 
+# Deprecated
 class ResourceVerifyCostView(APIView):
     permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
@@ -291,7 +293,7 @@ class ResourceExelUploadView(CreateAPIView):
     def get_instance(self):
         return self.instance
 
-
+# Deprecated
 class ResourceBulkDeleteView(APIView):
     permission_classes = [IsAuthenticated, OfficeWorkerPermission]
 
@@ -300,7 +302,7 @@ class ResourceBulkDeleteView(APIView):
         try:
             ids = data['ids']
         except KeyError as ex:
-            logger.warning(f"'id' not specified | {self.__class__.__name__}")
+            logger.warning(f"'ids' not specified | {self.__class__.__name__}")
             raise NoParameterSpecified('ids')
         if not isinstance(ids, list):
             logger.warning(f"'ids' has wrong type. Type: {type(ids)} | {self.__class__.__name__}")
@@ -311,3 +313,8 @@ class ResourceBulkDeleteView(APIView):
             logger.warning("Update error | {self.__class__.__name__}")
             raise UpdateError()
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
+
+
+class ResourceAdd(CreateAPIView):
+    pass
+    # serializer_class = R

@@ -60,7 +60,6 @@ class Orders:
             'order_specification__specification',
             'order_specification__specification__res_specs',
             'order_specification__specification__res_specs__resource'
-
         ).exclude(
             status__in=[
                 Order.OrderStatus.ARCHIVED

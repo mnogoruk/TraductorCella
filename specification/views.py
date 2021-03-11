@@ -262,7 +262,7 @@ class SpecificationBuildSetView(APIView):
             logger.warning(f"'amount' wrong type")
             raise NoParameterSpecified('amount')
 
-        from_resources = data.get('from_resources', False)
+        from_resources = data.get('from_resources', True)
         try:
             Specifications.build_set(s_id, amount, from_resources, user=request.user)
         except Specifications.CantBuildSet:

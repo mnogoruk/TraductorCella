@@ -298,7 +298,7 @@ class Specifications:
                             amount=resource['amount'],
                             specification=specification
                         )
-                        print(s.amount)
+                        # print(s.amount)
 
                         specification.resources = res_specs_dict
 
@@ -512,7 +512,6 @@ async def send_price(product_id, price):
             await session.post(bitrix_url, json={"ID": product_id, "price": price}, verify_ssl=False)
         except Exception as ex:
             logger.error(f"Error while post send_price", exc_info=True)
-
 
 
 async def upload_specifications(file_instance_id, operator_id=None):

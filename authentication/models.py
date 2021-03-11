@@ -90,6 +90,7 @@ class Account(AbstractBaseUser, PermissionsMixin):
     verifying_slug = models.SlugField(default=uuid.uuid4, editable=False, unique=True)
     role = models.IntegerField(choices=RoleChoice.choices, default=RoleChoice.DEFAULT)
     created_at = models.DateTimeField(auto_now_add=True)
+
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = []
 

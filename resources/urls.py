@@ -20,5 +20,6 @@ urlpatterns = [
     path('add-amount/', ResourceAddAmountView.as_view()),
     path('upload/', ResourceExelUploadView.as_view()),
     path('delete/', ResourceBulkDeleteView.as_view()),
-    path('expired-count/', ExpiredResourceCount.as_view())
+    path('expired-count/', ExpiredResourceCount.as_view()),
+    path('add/', )
 ]
