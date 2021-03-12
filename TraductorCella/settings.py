@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'whitenoise',
     'django.contrib.staticfiles',
+    'django_extensions',
     'resources',
     'specification',
     'authentication',

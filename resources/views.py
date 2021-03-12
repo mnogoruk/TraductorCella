@@ -13,7 +13,8 @@ from cella.serializer import FileSerializer
 from cella.service import Operators
 from resources.models import Resource
 from resources.serializer import ResourceSerializer, ResourceWithUnverifiedCostSerializer, ResourceActionSerializer, \
-    ResourceShortSerializer, ResourceProviderSerializer, ResourceSupplySerializer
+    ResourceShortSerializer, ResourceProviderSerializer, ResourceDeliverySerializer
+
 from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError, WrongParameterType
@@ -315,6 +316,17 @@ class ResourceBulkDeleteView(APIView):
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
 
-class ResourceAdd(CreateAPIView):
-    pass
-    # serializer_class = R
+
+class MakeDeliveryView(CreateAPIView):
+    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    serializer_class = ResourceDeliverySerializer
+
+    def perform_create(self, serializer):
+        try:
+            serializer.save(user=self.request.user)
+        except Resources.UpdateError:
+            logger.error(
+                f"Error while making Delivery. Request data: {self.request.data} | {self.__class__.__name__}",
+                exc_info=True)
+            raise UpdateError()
+
