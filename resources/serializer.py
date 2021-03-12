@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from .models import Resource, ResourceAction, ResourceProvider
+from .models import Resource, ResourceAction, ResourceProvider, ResourceDelivery
 from .service import Resources
 
 
@@ -111,3 +111,15 @@ class ResourceShortSerializer(serializers.ModelSerializer):
     class Meta:
         model = Resource
         fields = ['id', 'name', 'external_id', 'cost', 'amount']
+
+
+class ResourceDeliverySerializer(serializers.ModelSerializer):
+    provider_name = serializers.CharField(max_length=100)
+    cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
+
+    class Meta:
+        model = ResourceDelivery
+        fields = ['id', 'resource', 'provider_name', 'cost', 'amount', 'comment']
+
+    def create(self, validated_data):
+        return Resources.make_delivery(**validated_data)

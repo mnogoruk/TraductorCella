@@ -3,7 +3,7 @@ from django.urls import path
 from resources.views import ResourceListView, ResourceActionsView, ResourceUpdateView, ResourceCreateView, \
     ResourceDetailView, ResourceWithUnverifiedCostsView, ResourceSetCostView, ResourceVerifyCostView, \
     ResourceShortListView, ProviderListView, ResourceAddAmountView, ResourceExelUploadView, ResourceBulkDeleteView, \
-    ExpiredResourceCount
+    ExpiredResourceCount, MakeDeliveryView
 
 urlpatterns = [
     path('<int:r_id>/', ResourceDetailView.as_view()),
@@ -19,5 +19,6 @@ urlpatterns = [
     path('add-amount/', ResourceAddAmountView.as_view()),
     path('upload/', ResourceExelUploadView.as_view()),
     path('delete/', ResourceBulkDeleteView.as_view()),
-    path('expired-count/', ExpiredResourceCount.as_view())
+    path('expired-count/', ExpiredResourceCount.as_view()),
+    path('delivery/', MakeDeliveryView.as_view())
 ]

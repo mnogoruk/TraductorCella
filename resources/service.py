@@ -7,15 +7,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
-from django.db.models import OuterRef, Subquery, Exists, F, Q, Count, Sum, Min
-from django.db.models.functions import Cast
+from django.db.models import OuterRef, Subquery, Exists, F, Q, Count, Sum
 
 from cella.models import File
 from cella.service import Operators
 from specification.models import Specification, SpecificationResource
 from utils.function import random_str
 
-from .models import Resource, ResourceCost, ResourceProvider, ResourceAction
+from .models import Resource, ResourceCost, ResourceProvider, ResourceAction, ResourceDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +34,46 @@ class Resources:
 
     class UpdateError(Exception):
         pass
+
+    @classmethod
+    def make_delivery(cls, resource, new_name=None, provider_name=None, cost=0, amount=0, comment=None, user=None):
+        resource = cls.get(resource)
+
+        if new_name is not None:
+            resource.name = new_name
+
+        resource.comment = comment
+
+        provider = ResourceProvider.objects.get_or_create_by_name(provider_name).object()
+
+        resource.provider = provider
+        delivery = cls._create_delivery(resource, provider, cost, amount, comment)
+
+        cost, cost_action = cls.set_cost(resource, cost, user=user, save=False)
+        amount, amount_action = cls.change_amount(resource, amount, user=user, save=False)
+
+        try:
+            with transaction.atomic():
+                delivery.save()
+                resource.save()
+                cost.save()
+                cost_action.save()
+                amount_action.save()
+        except Exception as ex:
+            logger.error(f"make delivery error | {cls.__name__}", exc_info=True)
+
+        return delivery
+
+    @classmethod
+    def _create_delivery(cls, resource, provider, cost, amount, comment):
+        delivery = ResourceDelivery()
+        delivery.set_resource(resource)
+        delivery.set_amount(amount)
+        delivery.set_provider(provider)
+        delivery.set_comment(comment)
+        delivery.set_cost(cost)
+
+        return delivery
 
     @classmethod
     def get(cls, resource, related=None, prefetched=None):
