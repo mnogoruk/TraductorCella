@@ -335,3 +335,25 @@ class SpecificationXMLUploadView(CreateAPIView):
 
     def get_instance(self):
         return self.instance
+
+
+class ManageBuild(APIView):
+    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        try:
+            s_id = data['id']
+        except KeyError as ex:
+            logger.warning(f"'id' not specified | {self.__class__.__name__}", exc_info=True)
+            raise NoParameterSpecified('id')
+        try:
+            amount = float(data['amount'])
+        except KeyError as ex:
+            logger.warning(f"'amount' not specified | {self.__class__.__name__}", exc_info=True)
+            raise NoParameterSpecified('amount')
+
+        resources = Specifications.manage_build(s_id, amount)
+
+        return Response(data=resources, status=status.HTTP_200_OK)
+

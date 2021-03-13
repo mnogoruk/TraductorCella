@@ -36,22 +36,23 @@ class Resources:
         pass
 
     @classmethod
-    def make_delivery(cls, resource, new_name=None, provider_name=None, cost=0, amount=0, comment=None, user=None):
+    def make_delivery(cls, resource, new_name=None, provider_name=None, cost=0, amount=0, comment=None, time_stamp=None,
+                      user=None):
         resource = cls.get(resource)
 
         if new_name is not None:
             resource.name = new_name
 
         resource.comment = comment
-
         provider = ResourceProvider.objects.get_or_create_by_name(provider_name).object()
 
         resource.provider = provider
-        delivery = cls._create_delivery(resource, provider, cost, amount, comment)
+        delivery = cls._create_delivery(resource, provider, cost, amount, comment, time_stamp)
 
         cost, cost_action = cls.set_cost(resource, cost, user=user, save=False)
         amount, amount_action = cls.change_amount(resource, amount, user=user, save=False)
-
+        cost_action.time_stamp = time_stamp
+        amount_action.time_stamp = time_stamp
         try:
             with transaction.atomic():
                 delivery.save()
@@ -65,13 +66,14 @@ class Resources:
         return delivery
 
     @classmethod
-    def _create_delivery(cls, resource, provider, cost, amount, comment):
+    def _create_delivery(cls, resource, provider, cost, amount, comment, time_stamp):
         delivery = ResourceDelivery()
         delivery.set_resource(resource)
         delivery.set_amount(amount)
         delivery.set_provider(provider)
         delivery.set_comment(comment)
         delivery.set_cost(cost)
+        delivery.set_time_stamp(time_stamp)
 
         return delivery
 
@@ -115,7 +117,7 @@ class Resources:
     def change_amount(cls, resource, delta_amount, user=None, save=True):
         resource = cls.get(resource)
 
-        resource.amount += delta_amount
+        resource.amount = float(resource.amount) + float(delta_amount)
         if resource.amount < 0:
             logger.warning(f"resources amount < 0 for resources '{resource}'")
         action = ResourceAction(

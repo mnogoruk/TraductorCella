@@ -4,6 +4,7 @@ import string
 
 from django.core.mail import send_mail
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from utils.exception import CreationError, UpdateError
 from .models import Account
@@ -54,7 +55,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
                 email=email
             )
         except Exception as ex:
-            logger.error(f"Error while creating user. username={username}, role={validated_data['role']}, email={email}", exc_info=True)
+            logger.error(
+                f"Error while creating user. username={username}, role={validated_data['role']}, email={email}",
+                exc_info=True)
             raise CreationError()
         account.username = username
         account.password = password
@@ -94,3 +97,13 @@ class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = ['username', 'first_name', 'last_name', 'is_banned', 'email', 'role']
+
+
+class TokenObtainPairWithRoleSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        token['role'] = user.role
+
+        return token
