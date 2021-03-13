@@ -5,9 +5,11 @@ from rest_framework.generics import CreateAPIView, UpdateAPIView, ListAPIView, D
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from utils.exception import NoParameterSpecified, UpdateError
-from .serializer import UserCreateSerializer, UserEditSerializer, UserSerializer, AccountSerializer
+from .serializer import UserCreateSerializer, UserEditSerializer, UserSerializer, AccountSerializer, \
+    TokenObtainPairWithRoleSerializer
 from .models import Account
 from cella.models import Operator
 from authentication.permissions import DefaultPermission, AdminPermission
@@ -96,3 +98,11 @@ class AccountDetailView(RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class TokenObtainPairWithRoleView(TokenObtainPairView):
+    """
+    Takes a set of user credentials and returns an access and refresh JSON web
+    token pair to prove the authentication of those credentials.
+    """
+    serializer_class = TokenObtainPairWithRoleSerializer

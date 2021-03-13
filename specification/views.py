@@ -329,3 +329,4 @@ class ManageBuild(APIView):
         resources = Specifications.manage_build(s_id, amount)
 
         return Response(data=resources, status=status.HTTP_200_OK)
+

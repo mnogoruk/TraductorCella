@@ -1,5 +1,4 @@
 from rest_framework import serializers
-
 from resources.serializer import ResourceShortSerializer
 from specification.models import SpecificationCategory, Specification
 from specification.service import Specifications
