@@ -76,6 +76,7 @@ class ResourceDelivery(models.Model):
     cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     comment = models.CharField(max_length=400, null=True)
+    time_stamp = models.DateField(null=True)
 
     def set_resource(self, resource):
         self.resource = resource
@@ -91,6 +92,9 @@ class ResourceDelivery(models.Model):
 
     def set_comment(self, comment):
         self.comment = comment
+
+    def set_time_stamp(self, time_stamp):
+        self.time_stamp = time_stamp
 
     @property
     def provider_name(self):
