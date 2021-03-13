@@ -230,9 +230,21 @@ class Specifications:
             raise cls.QueryError()
 
     @classmethod
+    def manage_build(cls, specification, amount):
+        specification = cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
+
+        resources = []
+        for res_spec in specification.res_specs.all():
+            resource = res_spec.resource
+            residue = float(resource.amount) - float(res_spec.amount) * float(amount)
+            resources.append({'id': resource.id, 'amount': residue})
+
+        return resources
+
+    @classmethod
     def create(cls, name: str, product_id: str, price: float = None, coefficient: float = None,
                resources: List[Dict[str, str]] = None, category_name: str = None, amount: int = None,
-               storage_place=None,
+               storage_place=None, amount_accuracy='X',
                user=None):
 
         try:
@@ -259,7 +271,9 @@ class Specifications:
                     name=name,
                     product_id=product_id,
                     is_active=True,
-                    storage_place=storage_place)
+                    storage_place=storage_place,
+                    amount_accuracy=amount_accuracy
+                )
 
                 actions = []
 
@@ -465,11 +479,11 @@ class Specifications:
                     for res_spec in specification.res_specs.all():
                         resource = res_spec.resource
 
-                        if resource.amount < res_spec.amount * amount:
+                        if resource.amount < float(res_spec.amount) * float(amount):
                             raise cls.CantBuildSet()
 
                         else:
-                            _, action = Resources.change_amount(resource, -res_spec.amount * amount, operator,
+                            _, action = Resources.change_amount(resource, -float(res_spec.amount) * float(amount), operator,
                                                                 False)
                             resources.append(resource)
                             actions.append(action)

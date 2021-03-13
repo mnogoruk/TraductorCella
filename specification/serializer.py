@@ -89,7 +89,8 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             category_name=validated_data['category_name'],
             amount=validated_data['amount'],
             storage_place=validated_data.get('storage_place'),
-            user=validated_data['request'].user
+            user=validated_data['request'].user,
+            amount_accuracy=validated_data.get('amount_accuracy', 'X')
         )
         return spec
 

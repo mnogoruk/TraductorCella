@@ -117,7 +117,7 @@ class Resources:
     def change_amount(cls, resource, delta_amount, user=None, save=True):
         resource = cls.get(resource)
 
-        resource.amount += delta_amount
+        resource.amount = float(resource.amount) + float(delta_amount)
         if resource.amount < 0:
             logger.warning(f"resources amount < 0 for resources '{resource.id}'")
         action = ResourceAction(

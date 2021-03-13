@@ -28,6 +28,7 @@ class Specification(models.Model):
     verified = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     storage_place = models.CharField(max_length=100, null=True)
+    amount_accuracy = models.CharField(max_length=1, default='X')
 
     def __str__(self):
         return f"{self.name}"
