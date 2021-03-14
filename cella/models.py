@@ -1,31 +1,6 @@
-from django.contrib.auth import get_user_model
 from django.db import models
 
-from utils.db.query import GetOrCreateQuery
-
-
-class Operator(models.Model):
-    user = models.OneToOneField(get_user_model(),
-                                on_delete=models.SET_NULL,
-                                related_name='operator',
-                                null=True,
-                                blank=True)
-    name = models.CharField(max_length=150, null=True, blank=True)
-
-    def __str__(self):
-        return self.name if self.name is not None else getattr(self.user, 'username')
-
-    @classmethod
-    def get_system_operator(cls):
-        return GetOrCreateQuery(Operator).get_or_create(name='system').object()
-
-    @classmethod
-    def get_anonymous_operator(cls):
-        return GetOrCreateQuery(Operator).get_or_create(name='anonymous').object()
-
-    @classmethod
-    def get_user_operator(cls, user):
-        return GetOrCreateQuery(Operator).get_or_create(user=user).object()
+from authentication.models import Operator
 
 
 class File(models.Model):

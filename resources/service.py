@@ -293,7 +293,7 @@ class Resources:
         # TODO: test, optimize
         errors = []
         for resource in data:
-            resource['user'] = user
+            resource['applicant'] = user
             try:
                 cls.create(**resource)
             except cls.ExternalIdUniqueError as ex:

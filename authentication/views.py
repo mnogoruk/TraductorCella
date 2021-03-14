@@ -52,7 +52,7 @@ class UserChangePasswordView(APIView):
         user = request.user
         old_password = request.data['old_password']
         if not request.user.check_password(old_password):
-            logger.warning(f"Incorrect password for user: {user.username}")
+            logger.warning(f"Incorrect password for applicant: {user.username}")
             return Response(data={"old_password": "Incorrect password"}, status=status.HTTP_400_BAD_REQUEST)
         new_password = request.data['password']
         user.set_password(new_password)
@@ -102,7 +102,7 @@ class AccountDetailView(RetrieveAPIView):
 
 class TokenObtainPairWithRoleView(TokenObtainPairView):
     """
-    Takes a set of user credentials and returns an access and refresh JSON web
+    Takes a set of applicant credentials and returns an access and refresh JSON web
     token pair to prove the authentication of those credentials.
     """
     serializer_class = TokenObtainPairWithRoleSerializer

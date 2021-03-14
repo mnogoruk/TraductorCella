@@ -68,7 +68,7 @@ class ResourceSerializer(serializers.ModelSerializer):
         external_id = validated_data.get('external_id')
         provider_name = validated_data.get('provider_name')
         user = validated_data.get('request').user
-        update_data = {'user': user}
+        update_data = {'applicant': user}
 
         if resource_name is not None:
             update_data['resource_name'] = resource_name

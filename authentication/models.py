@@ -2,7 +2,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin, User
 from django.db import models
 
-from authentication.manager import AccountManager
+from authentication.manager import AccountManager, OperatorManager
 
 
 class Account(AbstractBaseUser, PermissionsMixin):
@@ -39,27 +39,42 @@ class Account(AbstractBaseUser, PermissionsMixin):
     def set_email(self, email):
         self.email = email
 
-    def _make_staff(self):
+    def make_staff(self):
         self.is_staff = True
 
-    def _unmake_staff(self):
+    def make_not_staff(self):
         self.is_staff = False
 
+    def make_superuser(self):
+        self.make_staff()
+
     def make_admin(self):
-        self._make_staff()
+        self.make_not_staff()
         self.role = self.RoleChoice.ADMIN
 
     def make_office_worker(self):
-        self._unmake_staff()
+        self.make_not_staff()
         self.role = self.RoleChoice.OFFICE_WORKER
 
     def make_storage_worker(self):
-        self._unmake_staff()
+        self.make_not_staff()
         self.role = self.RoleChoice.STORAGE_WORKER
 
     def make_default_user(self):
-        self._unmake_staff()
+        self.make_not_staff()
         self.role = self.RoleChoice.DEFAULT
+
+    def is_admin(self):
+        return self.role == self.RoleChoice.ADMIN
+
+    def is_storage_worker(self):
+        return self.role == self.RoleChoice.STORAGE_WORKER
+
+    def is_office_worker(self):
+        return self.role == self.RoleChoice.OFFICE_WORKER
+
+    def is_default_user(self):
+        return self.role == self.RoleChoice.DEFAULT
 
     def ban(self):
         self.is_banned = True
@@ -74,3 +89,41 @@ class Account(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.username
 
+
+class Operator(models.Model):
+    class OperatorTypeChoice(models.TextChoices):
+        USER = 'USR', 'User'
+        ANONYMOUS = 'ANS', 'Anonymous'
+        SYSTEM = 'STM', 'System'
+        DEFAULT = 'DFT', 'Default'
+
+    user = models.OneToOneField(Account,
+                                on_delete=models.SET_NULL,
+                                related_name='operator',
+                                null=True,
+                                blank=True)
+    name = models.CharField(max_length=150, null=True, blank=True)
+    type = models.CharField(max_length=3, default=OperatorTypeChoice.DEFAULT)
+
+    object = OperatorManager()
+
+    def set_user(self, user):
+        self.user = user
+
+    def set_name(self, name):
+        self.name = name
+
+    def is_anonymous(self):
+        return self.type == Operator.OperatorTypeChoice.ANONYMOUS
+
+    def is_system(self):
+        return self.type == Operator.OperatorTypeChoice.SYSTEM
+
+    def is_default(self):
+        return self.type == Operator.OperatorTypeChoice.DEFAULT
+
+    def is_user(self):
+        return self.type == Operator.OperatorTypeChoice.USER
+
+    def __str__(self):
+        return self.name
