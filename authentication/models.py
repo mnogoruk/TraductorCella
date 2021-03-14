@@ -1,84 +1,17 @@
-import uuid
-from datetime import time
-
-from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin, User
-from django.contrib import auth
 from django.db import models
-from django.apps import apps
 
-
-class RoleChoice(models.IntegerChoices):
-    ADMIN = 40, 'Admin'
-    OFFICE_WORKER = 30, 'Office worker'
-    STORAGE_WORKER = 20, 'Storage_worker'
-    DEFAULT = 10, 'Default'
-
-
-class UserManager(BaseUserManager):
-    use_in_migrations = True
-
-    def _create_user(self, username, password, **extra_fields):
-        """
-        Create and save a user with the given username, email, and password.
-        """
-        if not username:
-            raise ValueError('The given username must be set')
-        username = self.model.normalize_username(username)
-        user = self.model(username=username, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        Operator = apps.get_model('cella', 'Operator')
-        Operator.objects.create(user=user, name=user.username)
-        return user
-
-    def create_user(self, username, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', False)
-        extra_fields.setdefault('is_superuser', False)
-        user = self._create_user(username, password, **extra_fields)
-
-        return user
-
-    def create_superuser(self, username, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', RoleChoice.ADMIN)
-        extra_fields.setdefault('verified', True)
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
-
-        return self._create_user(username, password, **extra_fields)
-
-    def with_perm(self, perm, is_active=True, include_superusers=True, backend=None, obj=None):
-        if backend is None:
-            backends = auth._get_backends(return_tuples=True)
-            if len(backends) == 1:
-                backend, _ = backends[0]
-            else:
-                raise ValueError(
-                    'You have multiple authentication backends configured and '
-                    'therefore must provide the `backend` argument.'
-                )
-        elif not isinstance(backend, str):
-            raise TypeError(
-                'backend must be a dotted import path string (got %r).'
-                % backend
-            )
-        else:
-            backend = auth.load_backend(backend)
-        if hasattr(backend, 'with_perm'):
-            return backend.with_perm(
-                perm,
-                is_active=is_active,
-                include_superusers=include_superusers,
-                obj=obj,
-            )
-        return self.none()
+from authentication.manager import AccountManager
 
 
 class Account(AbstractBaseUser, PermissionsMixin):
+    class RoleChoice(models.IntegerChoices):
+        ADMIN = 40, 'Admin'
+        OFFICE_WORKER = 30, 'Office worker'
+        STORAGE_WORKER = 20, 'Storage_worker'
+        DEFAULT = 10, 'Default'
+
     username = models.CharField(max_length=100, unique=True)
 
     first_name = models.CharField(max_length=100, null=True)
@@ -86,14 +19,54 @@ class Account(AbstractBaseUser, PermissionsMixin):
     is_banned = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     email = models.EmailField(max_length=200, null=True)
-    verified = models.BooleanField(default=False)
-    verifying_slug = models.SlugField(default=uuid.uuid4, editable=False, unique=True)
     role = models.IntegerField(choices=RoleChoice.choices, default=RoleChoice.DEFAULT)
     created_at = models.DateTimeField(auto_now_add=True)
+
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = []
 
-    # Требуется для админки
+    objects = AccountManager()
+
+    def set_username(self, username):
+        self.username = username
+
+    def set_first_name(self, name):
+        self.first_name = name
+
+    def set_last_name(self, name):
+        self.last_name = name
+
+    def set_email(self, email):
+        self.email = email
+
+    def _make_staff(self):
+        self.is_staff = True
+
+    def _unmake_staff(self):
+        self.is_staff = False
+
+    def make_admin(self):
+        self._make_staff()
+        self.role = self.RoleChoice.ADMIN
+
+    def make_office_worker(self):
+        self._unmake_staff()
+        self.role = self.RoleChoice.OFFICE_WORKER
+
+    def make_storage_worker(self):
+        self._unmake_staff()
+        self.role = self.RoleChoice.STORAGE_WORKER
+
+    def make_default_user(self):
+        self._unmake_staff()
+        self.role = self.RoleChoice.DEFAULT
+
+    def ban(self):
+        self.is_banned = True
+
+    def unban(self):
+        self.is_banned = False
+
     @property
     def is_active(self):
         return not self.is_banned
@@ -101,4 +74,3 @@ class Account(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.username
 
-    objects = UserManager()

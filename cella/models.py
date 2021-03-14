@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 
+from utils.db.query import GetOrCreateQuery
+
 
 class Operator(models.Model):
     user = models.OneToOneField(get_user_model(),
@@ -15,33 +17,18 @@ class Operator(models.Model):
 
     @classmethod
     def get_system_operator(cls):
-        return Operator.objects.get_or_create(name='system')[0]
+        return GetOrCreateQuery(Operator).get_or_create(name='system').object()
 
     @classmethod
     def get_anonymous_operator(cls):
-        return Operator.objects.get_or_create(name='anonymous')[0]
+        return GetOrCreateQuery(Operator).get_or_create(name='anonymous').object()
 
     @classmethod
     def get_user_operator(cls, user):
-        return Operator.objects.get_or_create(user=user)[0]
-
-
-class Test1(models.Model):
-    test = models.CharField(max_length=100)
-    var = models.IntegerField()
-
-
-class Test2(models.Model):
-    tt = models.CharField(max_length=100, unique=True)
-    bb = models.FloatField()
-    v = models.ForeignKey(Test1, on_delete=models.CASCADE, null=True)
+        return GetOrCreateQuery(Operator).get_or_create(user=user).object()
 
 
 class File(models.Model):
-    class Direction(models.TextChoices):
-        RESOURCE_ADD = 'RAD', 'Resource add'
-
     file = models.FileField(blank=False, null=False)
-    direction = models.CharField(choices=Direction.choices, max_length=3, default=Direction.RESOURCE_ADD)
     operator = models.ForeignKey(Operator, on_delete=models.SET_NULL, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
