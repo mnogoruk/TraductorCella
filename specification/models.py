@@ -34,34 +34,6 @@ class Specification(models.Model):
         return f"{self.name}"
 
 
-class SpecificationAction(models.Model):
-    class ActionType(models.TextChoices):
-        CREATE = 'CRT', 'Create'
-        DEACTIVATE = 'DCT', 'Deactivate'
-        ACTIVATE = 'ACT', 'Activate'
-        SET_PRICE = 'STP', 'Set price'
-        SET_AMOUNT = 'STA', 'Set amount'
-        UPDATE_FIELDS = 'UPF', 'Update fields'
-        SET_COEFFICIENT = 'SCT', 'Set coefficient'
-        SET_CATEGORY = 'SCY', 'Set category'
-        BUILD_SET = 'BLS', 'Build set'
-
-    specification = models.ForeignKey(Specification,
-                                      on_delete=models.SET_NULL,
-                                      related_name='specification_actions',
-                                      null=True)
-    action_type = models.CharField(max_length=3, choices=ActionType.choices)
-    time_stamp = models.DateTimeField(auto_now_add=True)
-    value = models.CharField(max_length=300, null=True)
-    operator = models.ForeignKey(Operator,
-                                 on_delete=models.SET_NULL,
-                                 related_name='specification_actions',
-                                 null=True)
-
-    def __str__(self):
-        return f"{self.action_type} for {self.specification}"
-
-
 class SpecificationResource(models.Model):
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE, null=True, related_name='res_specs')
     specification = models.ForeignKey(Specification, on_delete=models.CASCADE, null=True, related_name='res_specs')
