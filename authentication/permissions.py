@@ -1,5 +1,7 @@
 from rest_framework import permissions
-from .models import RoleChoice
+from .models import Account
+
+RoleChoice = Account.RoleChoice
 
 
 class OfficeWorkerPermission(permissions.IsAuthenticated):
