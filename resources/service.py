@@ -48,6 +48,7 @@ class Resources:
         print(f'{comment}')
         print(f'{time_stamp}')
         print(f'{user}')
+        print(type(time_stamp))
         if name is not None:
             resource.name = name
 
@@ -64,6 +65,7 @@ class Resources:
             month=time_stamp.month,
             day=time_stamp.day,
         )
+        print(cost_action.time_stamp)
         amount_action.time_stamp = datetime(
             year=time_stamp.year,
             month=time_stamp.month,
