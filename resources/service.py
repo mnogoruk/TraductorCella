@@ -56,7 +56,7 @@ class Resources:
         provider = ResourceProvider.objects.get_or_create_by_name(provider_name).object()
 
         resource.provider = provider
-        delivery = cls._create_delivery(resource, provider, cost, amount, comment, time_stamp)
+        delivery = cls._create_delivery(resource, provider, cost, amount, comment, time_stamp, name)
 
         cost, cost_action = cls.set_cost(resource, cost, user=user, save=False)
         amount, amount_action = cls.change_amount(resource, amount, user=user, save=False)
@@ -84,13 +84,14 @@ class Resources:
         return delivery
 
     @classmethod
-    def _create_delivery(cls, resource, provider, cost, amount, comment, time_stamp):
+    def _create_delivery(cls, resource, provider, cost, amount, comment, time_stamp, name):
         delivery = ResourceDelivery()
         delivery.set_resource(resource)
         delivery.set_amount(amount)
         delivery.set_provider(provider)
         delivery.set_comment(comment)
         delivery.set_cost(cost)
+        delivery.set_name(name)
         delivery.set_time_stamp(time_stamp)
 
         return delivery
