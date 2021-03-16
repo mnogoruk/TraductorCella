@@ -38,8 +38,9 @@ class Resource(models.Model):
 class ResourceCost(models.Model):
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
     value = models.DecimalField(max_digits=8, decimal_places=2)
-    time_stamp = models.DateTimeField(auto_now=True)
+    time_stamp = models.DateTimeField(default=timezone.now)
     verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f'{self.resource.name} - {self.value}'
