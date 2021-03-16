@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class OrderDetailView(RetrieveAPIView):
     serializer_class = OrderDetailSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_object(self):
         o_id = self.kwargs.get('o_id')
@@ -36,7 +36,7 @@ class OrderDetailView(RetrieveAPIView):
 
 class OrderListView(ListAPIView):
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     filterset_fields = ['status']
@@ -70,7 +70,7 @@ class OrderListView(ListAPIView):
 
 
 class OrderAssembleSpecificationView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+    permission_classes = [StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -104,7 +104,7 @@ class OrderAssembleSpecificationView(APIView):
 
 
 class OrderDisAssembleSpecificationView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+    permission_classes = [StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -139,7 +139,7 @@ class OrderDisAssembleSpecificationView(APIView):
 
 
 class OrderManageActionView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+    permission_classes = [StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -181,7 +181,7 @@ class OrderManageActionView(APIView):
 
 
 class OrderAssemblingInfoView(APIView):
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         o_id = self.kwargs.get('o_id')
@@ -199,7 +199,7 @@ class OrderStatusCount(APIView):
 
 
 class OrderBulkDeleteView(APIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -216,7 +216,7 @@ class OrderBulkDeleteView(APIView):
 
 class OrderCreateView(CreateAPIView):
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)

@@ -12,12 +12,12 @@ import logging
 from django.db.models import OuterRef, Subquery, Exists, Sum, Min, IntegerField, F, Count, Q
 from django.db.models.functions import Cast
 
+from authentication.models import Operator
 from cella.models import File
-from cella.service import Operators
-from resources.models import ResourceCost, Resource, ResourceAction
+from resources.models import Resource
 from resources.service import Resources
 from utils.function import resource_amounts
-from .models import Specification, SpecificationAction, SpecificationCategory, SpecificationResource
+from .models import Specification, SpecificationCategory, SpecificationResource
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -85,17 +85,12 @@ class Specifications:
         if coefficient < 0:
             logger.warning(f"specification coefficient < 0 for specification '{specification.id}' | {cls.__name__}")
 
-        action = SpecificationAction(
-            specification=specification,
-            action_type=SpecificationAction.ActionType.SET_COEFFICIENT,
-            operator=Operators.get_operator(user),
-            value=str(coefficient)
-        )
+
         if save:
             specification.save()
-            action.save()
 
-        return coefficient, action
+
+        return coefficient
 
     @classmethod
     def set_price(cls, specification, price: float, user=None, save=True, send=False):
@@ -106,21 +101,14 @@ class Specifications:
         if price < 0:
             logger.warning(f"specification price < 0 for specification '{specification.id}' | {cls.__name__}")
 
-        action = SpecificationAction(
-            specification=specification,
-            action_type=SpecificationAction.ActionType.SET_PRICE,
-            operator=Operators.get_operator(user),
-            value=str(price)
-        )
-
         if save:
             specification.save()
-            action.save()
+
 
         if send:
             s_p = async_to_sync(cls.send_price)
             s_p(specification.product_id, price)
-        return price, action
+        return price
 
     @classmethod
     def set_amount(cls, specification, amount: float, user=None, save=True):
@@ -129,18 +117,10 @@ class Specifications:
         if amount < 0:
             logger.warning(f"specification amount < 0 for specification '{specification.id}' | {cls.__name__}")
 
-        action = SpecificationAction(
-            specification=specification,
-            action_type=SpecificationAction.ActionType.SET_AMOUNT,
-            operator=Operators.get_operator(user),
-            value=str(amount)
-        )
-
         if save:
             specification.save()
-            action.save()
 
-        return amount, action
+        return amount
 
     @classmethod
     def set_category(cls, specification, category, user=None, save=True):
@@ -148,38 +128,17 @@ class Specifications:
         specification = cls.get(specification)
         specification.category = category
 
-        action = SpecificationAction(
-            specification=specification,
-            action_type=SpecificationAction.ActionType.SET_CATEGORY,
-            operator=Operators.get_operator(user),
-            value=category.name
-        )
-
         if save:
             specification.save()
-            action.save()
 
-        return category, action
+
+        return category
 
     @classmethod
     def set_category_many(cls, ids: List, category, user):
         category = cls.get_category(category)
         Specification.objects.filter(id__in=ids).update(category=category, coefficient=category.coefficient)
         actions = []
-        for s_id in ids:
-            actions.append(
-                SpecificationAction(
-                    specification_id=s_id,
-                    action_type=SpecificationAction.ActionType.SET_CATEGORY,
-                    operator=Operators.get_operator(user),
-                    value=category.name
-                )
-            )
-        try:
-            SpecificationAction.objects.bulk_create(actions)
-        except DatabaseError:
-            logger.error(f"Set category Error, ids={ids}, category={category} | {cls.__name__}", exc_info=True)
-            raise cls.CreateError()
         return category, actions
 
     @classmethod
@@ -187,12 +146,9 @@ class Specifications:
         try:
             specification = cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
             query_res_spec = SpecificationResource.objects.filter(specification=specification, resource=OuterRef('pk'))
-            cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
             resources = Resource.objects.annotate(
-                cost=Subquery(cost_qr.values('value')[:1]),
                 res_spec_ex=Exists(query_res_spec.values('id')),
-                needed_amount=Subquery(query_res_spec.values('amount')[:1]),
-                verified=Subquery(cost_qr.values('verified')[:1])).filter(res_spec_ex=True)
+                needed_amount=Subquery(query_res_spec.values('amount')[:1]))
             reses = []
             prime_cost = 0
             for resource in resources:
@@ -210,11 +166,10 @@ class Specifications:
     @classmethod
     def list(cls):
         try:
-            query_cost = ResourceCost.objects.filter(resource_id=OuterRef('resource_id')).order_by('-time_stamp')
+            resources_query = Resource.objects.filter(id=OuterRef('resource_id'))
             query_res_spec = SpecificationResource.objects.filter(specification=OuterRef('pk')).values(
                 'specification_id').annotate(
-                total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')),
-                verified=Min(Cast(query_cost.values('verified')[:1], output_field=IntegerField())))
+                total_cost=Sum(Subquery(resources_query.values('cost')[0]) * F('amount')))
             specifications = Specification.objects.select_related('category').annotate(
                 prime_cost=Subquery(query_res_spec.values('total_cost')))
         except DatabaseError:
@@ -250,16 +205,12 @@ class Specifications:
         try:
             with transaction.atomic():
 
-                operator = Operators.get_operator(user)
+                operator = Operator.objects.get_or_create_operator(user)
 
                 if Specification.objects.filter(product_id=product_id, is_active=True).exists():
                     s = Specification.objects.filter(product_id=product_id).get(is_active=True)
                     s.is_active = False
                     s.save()
-
-                    SpecificationAction.objects.create(specification=s,
-                                                       action_type=SpecificationAction.ActionType.DEACTIVATE,
-                                                       operator=operator)
 
                 if price is None:
                     price = 0
@@ -316,14 +267,9 @@ class Specifications:
 
                         specification.resources = res_specs_dict
 
-                SpecificationAction.objects.create(
-                    specification=specification,
-                    action_type=SpecificationAction.ActionType.CREATE,
-                    operator=operator
-                )
+
 
                 specification.save()
-                SpecificationAction.objects.bulk_create(actions)
 
         except DatabaseError as ex:
             logger.warning(f"Create error specification_name={name}, product_id={product_id}, "
@@ -341,7 +287,7 @@ class Specifications:
             with transaction.atomic():
 
                 specification = cls.get(specification)
-                operator = Operators.get_operator(user)
+                operator = Operator.objects.get_or_create_operator(user)
 
                 value_data = []
 
@@ -356,9 +302,6 @@ class Specifications:
                     specification.product_id = product_id
                     value_data.append(f"product_id={product_id}")
 
-                SpecificationAction.objects.create(specification=specification,
-                                                   action_type=SpecificationAction.ActionType.UPDATE_FIELDS,
-                                                   operator=operator)
                 # -----------
 
                 # Setting category, price, coefficient, amount block
@@ -405,7 +348,6 @@ class Specifications:
                     _resources = []
                     for resource in resource_to_add:
                         res = Resource.objects.get(id=resource['id'])
-                        res.cost = ResourceCost.objects.filter(resource=res).latest('time_stamp').value
                         res_specs.append(
                             SpecificationResource.objects.create(
                                 resource_id=resource['id'],
@@ -420,8 +362,6 @@ class Specifications:
                         specification=specification)
                     for res_spec in res_specs:
                         res = res_spec.resource
-                        res_cost = ResourceCost.objects.filter(resource=res).latest('time_stamp')
-                        res.cost = res_cost.value
 
                     specification.resources = res_specs
 
@@ -474,7 +414,7 @@ class Specifications:
                 resources = []
                 actions = []
 
-                operator = Operators.get_operator(user)
+                operator = Operator.objects.get_or_create_operator(user)
                 if from_resources:
                     for res_spec in specification.res_specs.all():
                         resource = res_spec.resource
@@ -489,18 +429,11 @@ class Specifications:
                             actions.append(action)
 
                     Resource.objects.bulk_update(resources, fields=['amount'])
-                    ResourceAction.objects.bulk_create(actions)
 
                     value = 'from_resources=True'
                 else:
                     value = 'from_resources=False'
 
-                SpecificationAction.objects.create(
-                    specification=specification,
-                    action_type=SpecificationAction.ActionType.BUILD_SET,
-                    value=value,
-                    operator=Operators.get_operator(user)
-                )
                 specification.amount += amount
                 specification.save()
         except DatabaseError as ex:

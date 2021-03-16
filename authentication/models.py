@@ -105,7 +105,7 @@ class Operator(models.Model):
     name = models.CharField(max_length=150, null=True, blank=True)
     type = models.CharField(max_length=3, default=OperatorTypeChoice.DEFAULT)
 
-    object = OperatorManager()
+    objects = OperatorManager()
 
     def set_user(self, user):
         self.user = user

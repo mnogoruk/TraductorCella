@@ -1,5 +1,6 @@
 from django.contrib import auth
 from django.contrib.auth.base_user import BaseUserManager
+from django.contrib.auth.models import AnonymousUser
 from django.db.models import Manager
 from django.apps import apps
 
@@ -36,7 +37,6 @@ class AccountManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('role', self.model.RoleChoice.ADMIN)
-        extra_fields.setdefault('verified', True)
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
@@ -51,8 +51,7 @@ class AccountManager(BaseUserManager):
         user = self.model(username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
-        operator_modal = apps.get_model('cella', 'Operator')
-        operator_modal.objects.create(user=user, name=user.username)
+
         return user
 
     def with_perm(self, perm, is_active=True, include_superusers=True, backend=None, obj=None):
@@ -88,19 +87,20 @@ class OperatorManager(Manager):
 
         if isinstance(applicant, self.model):
             return applicant
-        elif isinstance(applicant, apps.get_model('Account')):
-            if applicant.is_anonymous:
-                if self.anonymous_operator_exists():
-                    return self.get_anonymous_operator()
-                else:
-                    operator = self._create_anonymous_operator()
-                    return operator
+        elif isinstance(applicant, int):
+            return self.get(id=applicant)
+        elif isinstance(applicant, apps.get_model('authentication.Account')):
+            if self.user_operator_exists(applicant):
+                return self.get_user_operator(applicant)
             else:
-                if self.user_operator_exists(applicant):
-                    return self.get(user=applicant)
-                else:
-                    operator = self._create_user_operator(applicant)
-                    return operator
+                operator = self._create_user_operator(applicant)
+                return operator
+        elif isinstance(applicant, AnonymousUser):
+            if self.anonymous_operator_exists():
+                return self.get_anonymous_operator()
+            else:
+                operator = self._create_anonymous_operator()
+                return operator
         elif applicant == 'system':
             if self.system_operator_exists():
                 return self.get_system_operator()

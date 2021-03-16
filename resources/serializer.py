@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from .models import Resource, ResourceAction, ResourceProvider, ResourceDelivery
+from .models import Resource, ResourceProvider, ResourceDelivery
 from .service import Resources
 
 
@@ -9,26 +9,6 @@ class ResourceProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ResourceProvider
         fields = '__all__'
-
-
-class ResourceActionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ResourceAction
-        fields = '__all__'
-
-
-class ResourceWithUnverifiedCostSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(read_only=True)
-    external_id = serializers.CharField(read_only=True)
-    provider = ResourceProviderSerializer(read_only=True, allow_null=True)
-    old_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    new_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    verified = serializers.BooleanField()
-
-    class Meta:
-        model = Resource
-        fields = ['id', 'name', 'external_id', 'provider', 'old_cost', 'new_cost', 'amount', 'verified']
 
 
 class ResourceSerializer(serializers.ModelSerializer):
@@ -45,8 +25,8 @@ class ResourceSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
     last_change_cost = serializers.DateTimeField(read_only=True)
     last_change_amount = serializers.DateTimeField(read_only=True)
-    verified = serializers.BooleanField(allow_null=True, read_only=True)
-    storage_place = serializers.CharField(allow_null=True, required=False)
+    storage_place = serializers.CharField(allow_null=True, required=False, allow_blank=True)
+    amount_limit = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True, default=0)
 
     def create(self, validated_data):
         resource = Resources.create(
@@ -101,7 +81,7 @@ class ResourceSerializer(serializers.ModelSerializer):
             'storage_place',
             'last_change_amount',
             'last_change_cost',
-            'verified']
+        ]
 
 
 class ResourceShortSerializer(serializers.ModelSerializer):
@@ -114,7 +94,7 @@ class ResourceShortSerializer(serializers.ModelSerializer):
 
 
 class ResourceDeliverySerializer(serializers.ModelSerializer):
-    provider_name = serializers.CharField(max_length=100)
+    provider_name = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
     cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
 
     class Meta:

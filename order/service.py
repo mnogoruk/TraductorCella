@@ -9,12 +9,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 from django.db.models import Count, Q
 
-from cella.service import Operators
-from order.models import Order, OrderSource, OrderSpecification, OrderAction
+from order.models import Order, OrderSource, OrderSpecification
 from resources.service import Resources
 from specification.models import Specification
 from specification.service import Specifications
 from utils.function import product_amounts
+from authentication.models import Operator
 
 logger = logging.getLogger(__name__)
 
@@ -148,15 +148,9 @@ class Orders:
                 f"Can't assemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
             raise cls.AssembleError()
 
-        operator = Operators.get_operator(user)
+        operator = Operator.objects.get_or_create_operator(user)
         try:
             OrderSpecification.objects.filter(specification=specification, order=order).update(assembled=True)
-
-            OrderAction.objects.create(
-                order=order,
-                action_type=OrderAction.ActionType.ASSEMBLING_SPECIFICATION,
-                operator=operator
-            )
 
             if order.status == Order.OrderStatus.ACTIVE:
                 cls._assembling(order, operator)
@@ -180,15 +174,9 @@ class Orders:
 
         try:
 
-            operator = Operators.get_operator(user)
+            operator = Operator.objects.get_or_create_operator(user)
 
             OrderSpecification.objects.filter(specification=specification, order=order).update(assembled=False)
-
-            OrderAction.objects.create(
-                order=order,
-                action_type=OrderAction.ActionType.DISASSEMBLING_SPECIFICATION,
-                operator=operator
-            )
 
             if order.status == Order.OrderStatus.READY:
                 cls._assembling(order, operator)
@@ -217,7 +205,7 @@ class Orders:
             if not order.status == Order.OrderStatus.READY:
                 logger.warning(f"Cant confirm order with status {order.status}. Order: {order} | {cls.__name__}")
                 raise cls.ActionError()
-            cls._confirm(order, Operators.get_operator(user))
+            cls._confirm(order, Operator.objects.get_or_create_operator(user))
             order.save()
 
             ch_s = async_to_sync(cls.change_status)
@@ -254,7 +242,7 @@ class Orders:
             raise cls.ActionError()
 
         order_specs = order.order_specification
-        operator = Operators.get_operator(user)
+        operator = Operator.objects.get_or_create_operator(user)
 
         try:
             with transaction.atomic():
@@ -284,7 +272,7 @@ class Orders:
 
                     specification.save()
 
-                cls._activate(order, Operators.get_operator(user))
+                cls._activate(order, Operator.objects.get_or_create_operator(user))
                 order.save()
             ch_s = async_to_sync(cls.change_status)
             ch_s(order.external_id, 'S')
@@ -295,7 +283,7 @@ class Orders:
     @classmethod
     def deactivate(cls, order, user):
         order = cls.get(order)
-        operator = Operators.get_operator(user)
+        operator = Operator.objects.get_or_create_operator(user)
 
         if order.status not in [Order.OrderStatus.ACTIVE, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.READY]:
             logger.warning(f"Can't deactivate order with status {order.status}. Order: {order} | {cls.__name__}",
@@ -314,7 +302,7 @@ class Orders:
                     resource = res_spec.resource
                     Resources.change_amount(resource, res_spec.amount * order_spec.amount, operator)
 
-            cls._deactivate(order, Operators.get_operator(user))
+            cls._deactivate(order, Operator.objects.get_or_create_operator(user))
             order.save()
 
             ch_s = async_to_sync(cls.change_status)
@@ -336,12 +324,6 @@ class Orders:
                     external_id=external_id,
                     status=Order.OrderStatus.INACTIVE,
                     source=source)
-
-                OrderAction.objects.create(
-                    order=order,
-                    action_type=OrderAction.ActionType.CREATE,
-                    operator=Operators.get_operator(user)
-                )
 
                 if products is not None and len(products) != 0:
                     order_specs = []
@@ -384,65 +366,30 @@ class Orders:
     @classmethod
     def _activate(cls, order, operator):
         order.status = Order.OrderStatus.ACTIVE
-        OrderAction.objects.create(
-            order=order,
-            action_type=OrderAction.ActionType.ACTIVATE,
-            operator=operator
-        )
 
     @classmethod
     def _deactivate(cls, order, operator):
         order.status = Order.OrderStatus.INACTIVE
-        OrderAction.objects.create(
-            order=order,
-            action_type=OrderAction.ActionType.DEACTIVATE,
-            operator=operator
-        )
 
     @classmethod
     def _assembling(cls, order, operator):
         order.status = Order.OrderStatus.ASSEMBLING
-        OrderAction.objects.create(
-            order=order,
-            action_type=OrderAction.ActionType.ASSEMBLING,
-            operator=operator
-        )
 
     @classmethod
     def _ready(cls, order, operator):
         order.status = Order.OrderStatus.READY
-        OrderAction.objects.create(
-            order=order,
-            action_type=OrderAction.ActionType.PREPARING,
-            operator=operator
-        )
 
     @classmethod
     def _confirm(cls, order, operator):
         order.status = Order.OrderStatus.CONFIRMED
-        OrderAction.objects.create(
-            order=order,
-            action_type=OrderAction.ActionType.CONFIRM,
-            operator=operator
-        )
 
     @classmethod
     def _archive(cls, order, operator):
         order.status = Order.OrderStatus.ARCHIVED
-        OrderAction.objects.create(
-            order=order,
-            action_type=OrderAction.ActionType.ARCHIVATION,
-            operator=operator
-        )
 
     @classmethod
     def _cancel(cls, order, operator):
         order.status = Order.OrderStatus.CANCELED
-        OrderAction.objects.create(
-            oreder=order,
-            action_type=OrderAction.ActionType.CANCEL,
-            operator=operator,
-        )
 
     @classmethod
     async def change_status(cls, order_id, status):

@@ -10,8 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
+from authentication.models import Operator
 from cella.serializer import FileSerializer
-from cella.service import Operators
 from resources.models import Resource
 from resources.service import Resources
 from specification.models import Specification
@@ -295,7 +295,7 @@ class SpecificationXMLUploadView(CreateAPIView):
         instance = self.get_instance()
         print("deedededededededelzskrfnkbjdnafzskv bksdb xfkved")
         try:
-            operator = Operators.get_operator(request.user)
+            operator = Operator.objects.get_or_create_operator(request.user)
             creation = async_to_sync(Specifications.create_from_xml)
             creation(file_instance_id=instance.id, operator_id=operator.id)
         except Exception as e:
