@@ -243,7 +243,7 @@ class Resources:
 
         resource = cls.get(resource)
         try:
-            cost = ResourceCost.objects.filter(resource=resource).latest('time_stamp')
+            cost = ResourceCost.objects.filter(resource=resource).latest('created_at')
         except ResourceCost.DoesNotExist:
             logger.warning(f"ResourceCost does not exist for Resource '{resource}' | {cls.__name__}", exc_info=True)
             cost = ResourceCost.objects.create(resource=resource, value=0)
@@ -323,11 +323,11 @@ class Resources:
     @classmethod
     def list(cls):
         try:
-            cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
+            cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-created_at')
             query = Resource.objects.select_related('provider').annotate(
                 cost=Subquery(cost_qr.values('value')[:1]),
-                last_change_cost=Subquery(cost_qr.values('time_stamp')[:1]),
-                last_change_amount=Subquery(cost_qr.values('time_stamp')[:1]),
+                last_change_cost=Subquery(cost_qr.values('created_at')[:1]),
+                last_change_amount=Subquery(cost_qr.values('created_at')[:1]),
                 verified=Subquery(cost_qr.values('verified')[:1]),
             )
         except DatabaseError as ex:
@@ -338,7 +338,7 @@ class Resources:
 
     @classmethod
     def shortlist(cls):
-        query_cost = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
+        query_cost = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-created_at')
         query = Resource.objects.select_related('provider').annotate(
             cost=Subquery(query_cost.values('value')[:1])).order_by('name')
         return query

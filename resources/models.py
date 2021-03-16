@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.db import models
+from django.utils import timezone
 
 from cella.models import Operator
 from .manager import ResourceProviderManager
@@ -61,11 +62,12 @@ class ResourceAction(models.Model):
                                  related_name='resource_actions')
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     value = models.CharField(max_length=300, null=True)
-    time_stamp = models.DateTimeField(default=datetime.now)
+    time_stamp = models.DateTimeField(default=timezone.now)
     operator = models.ForeignKey(Operator,
                                  on_delete=models.SET_NULL,
                                  related_name='resource_actions',
                                  null=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"{self.action_type} for {self.resource}"
