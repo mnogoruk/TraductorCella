@@ -322,14 +322,10 @@ class Resources:
     def list(cls):
         try:
             cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
-            amount_action = ResourceAction.objects.filter(
-                resource=OuterRef('pk'),
-                action_type__in=[ResourceAction.ActionType.SET_AMOUNT, ResourceAction.ActionType.CHANGE_AMOUNT]
-            ).order_by('-time_stamp')
             query = Resource.objects.select_related('provider').annotate(
                 cost=Subquery(cost_qr.values('value')[:1]),
                 last_change_cost=Subquery(cost_qr.values('time_stamp')[:1]),
-                last_change_amount=Subquery(amount_action.values('time_stamp')[:1]),
+                last_change_amount=Subquery(cost_qr.values('time_stamp')[:1]),
                 verified=Subquery(cost_qr.values('verified')[:1]),
             )
         except DatabaseError as ex:

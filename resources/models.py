@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db import models
 
 from cella.models import Operator
@@ -59,7 +61,7 @@ class ResourceAction(models.Model):
                                  related_name='resource_actions')
     action_type = models.CharField(max_length=3, choices=ActionType.choices)
     value = models.CharField(max_length=300, null=True)
-    time_stamp = models.DateTimeField(auto_now_add=True)
+    time_stamp = models.DateTimeField(default=datetime.now)
     operator = models.ForeignKey(Operator,
                                  on_delete=models.SET_NULL,
                                  related_name='resource_actions',
@@ -67,6 +69,7 @@ class ResourceAction(models.Model):
 
     def __str__(self):
         return f"{self.action_type} for {self.resource}"
+
 
 class ResourceDelivery(models.Model):
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
@@ -101,4 +104,3 @@ class ResourceDelivery(models.Model):
 
     def __str__(self):
         return f"Delivery for {self.resource.id} - {self.amount}"
-

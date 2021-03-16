@@ -122,7 +122,7 @@ class ResourceDeliverySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ResourceDelivery
-        fields = ['id', 'resource', 'provider_name', 'cost', 'amount', 'comment', 'time_stamp']
+        fields = ['id', 'resource', 'provider_name', 'cost', 'amount', 'comment', 'time_stamp', 'name']
 
     def create(self, validated_data):
         return Resources.make_delivery(**validated_data)
