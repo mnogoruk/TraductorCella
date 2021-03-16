@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 import aiohttp
 from asgiref.sync import sync_to_async, async_to_sync
@@ -36,12 +37,19 @@ class Resources:
         pass
 
     @classmethod
-    def make_delivery(cls, resource, new_name=None, provider_name=None, cost=0, amount=0, comment=None, time_stamp=None,
+    def make_delivery(cls, resource, name=None, provider_name=None, cost=0, amount=0, comment=None, time_stamp=None,
                       user=None):
         resource = cls.get(resource)
-
-        if new_name is not None:
-            resource.name = new_name
+        print(f'{resource}')
+        print(f'{name}')
+        print(f'{provider_name}')
+        print(f'{cost}')
+        print(f'{amount}')
+        print(f'{comment}')
+        print(f'{time_stamp}')
+        print(f'{user}')
+        if name is not None:
+            resource.name = name
 
         resource.comment = comment
         provider = ResourceProvider.objects.get_or_create_by_name(provider_name).object()
@@ -51,8 +59,16 @@ class Resources:
 
         cost, cost_action = cls.set_cost(resource, cost, user=user, save=False)
         amount, amount_action = cls.change_amount(resource, amount, user=user, save=False)
-        cost_action.time_stamp = time_stamp
-        amount_action.time_stamp = time_stamp
+        cost_action.time_stamp = datetime(
+            year=time_stamp.year,
+            month=time_stamp.month,
+            day=time_stamp.day,
+        )
+        amount_action.time_stamp = datetime(
+            year=time_stamp.year,
+            month=time_stamp.month,
+            day=time_stamp.day,
+        )
         try:
             with transaction.atomic():
                 delivery.save()
@@ -480,7 +496,8 @@ def session_post(session, products, lnp):
         product = products[i]
         logger.info(f"sent prime cost {product}")
         i += 1
-        yield session.post(bitrix_url, json={"ID": str(product["product_id"]), "primeCost": float(product['prime_cost'])},
+        yield session.post(bitrix_url,
+                           json={"ID": str(product["product_id"]), "primeCost": float(product['prime_cost'])},
                            headers=headers)
 
 

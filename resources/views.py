@@ -294,6 +294,7 @@ class ResourceExelUploadView(CreateAPIView):
     def get_instance(self):
         return self.instance
 
+
 # Deprecated
 class ResourceBulkDeleteView(APIView):
     permission_classes = [IsAuthenticated, OfficeWorkerPermission]
@@ -316,7 +317,6 @@ class ResourceBulkDeleteView(APIView):
         return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
 
 
-
 class MakeDeliveryView(CreateAPIView):
     permission_classes = [IsAuthenticated, OfficeWorkerPermission]
     serializer_class = ResourceDeliverySerializer
@@ -329,4 +329,3 @@ class MakeDeliveryView(CreateAPIView):
                 f"Error while making Delivery. Request data: {self.request.data} | {self.__class__.__name__}",
                 exc_info=True)
             raise UpdateError()
-

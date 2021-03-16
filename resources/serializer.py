@@ -29,7 +29,7 @@ class ResourceWithUnverifiedCostSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Resource
-        fields = ['id', 'name', 'external_id', 'provider', 'old_cost', 'new_cost', 'amount', 'verified']
+        fields = ['id', 'name', 'external_id', 'provider', 'old_cost', 'new_cost', 'amount', 'verified', 'comment']
 
 
 class ResourceSerializer(serializers.ModelSerializer):
@@ -102,7 +102,8 @@ class ResourceSerializer(serializers.ModelSerializer):
             'storage_place',
             'last_change_amount',
             'last_change_cost',
-            'verified']
+            'verified',
+            'comment']
 
 
 class ResourceShortSerializer(serializers.ModelSerializer):
@@ -117,6 +118,7 @@ class ResourceShortSerializer(serializers.ModelSerializer):
 class ResourceDeliverySerializer(serializers.ModelSerializer):
     provider_name = serializers.CharField(max_length=100)
     cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
+    comment = serializers.CharField(max_length=400, allow_blank=True, allow_null=True, default='')
 
     class Meta:
         model = ResourceDelivery
