@@ -71,6 +71,11 @@ class Resources:
             month=time_stamp.month,
             day=time_stamp.day,
         )
+        cost.time_stamp = datetime(
+            year=time_stamp.year,
+            month=time_stamp.month,
+            day=time_stamp.day,
+        )
         try:
             with transaction.atomic():
                 delivery.save()
