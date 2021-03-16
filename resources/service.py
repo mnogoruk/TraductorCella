@@ -332,8 +332,8 @@ class Resources:
             cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-created_at')
             query = Resource.objects.select_related('provider').annotate(
                 cost=Subquery(cost_qr.values('value')[:1]),
-                last_change_cost=Subquery(cost_qr.values('created_at')[:1]),
-                last_change_amount=Subquery(cost_qr.values('created_at')[:1]),
+                last_change_cost=Subquery(cost_qr.values('time_stamp')[:1]),
+                last_change_amount=Subquery(cost_qr.values('time_stamp')[:1]),
                 verified=Subquery(cost_qr.values('verified')[:1]),
             )
         except DatabaseError as ex:
