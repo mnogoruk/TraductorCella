@@ -231,11 +231,6 @@ class ReceiveOrderView(CreateAPIView):
         return serializer.save(request=self.request)
 
     def post(self, request, *args, **kwargs):
-        logger.info(f"Received order {request.data} | {self.__class__.__name__}")
-        try:
-            self.create(request, *args, **kwargs)
-            return Response(data={'received': True}, status=status.HTTP_202_ACCEPTED)
-        except Exception as ex:
-            logger.warning("Can't receive order", exc_info=True)
-            return Response(data={'received': False}, status=status.HTTP_400_BAD_REQUEST)
+        print(request.data)
+        return Response(data={'received': True}, status=status.HTTP_200_OK)
 

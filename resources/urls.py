@@ -22,5 +22,4 @@ urlpatterns = [
     path('delete/', ResourceBulkDeleteView.as_view()),
     path('expired-count/', ExpiredResourceCount.as_view()),
     path('delivery/', MakeDeliveryView.as_view())
-
 ]
