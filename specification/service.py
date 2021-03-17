@@ -215,7 +215,7 @@ class Specifications:
                 'specification_id').annotate(
                 total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')),
                 verified=Min(Cast(query_cost.values('verified')[:1], output_field=IntegerField())))
-            specifications = Specification.objects.select_related('category').annotate(
+            specifications = Specification.objects.select_related('category').filter(is_active=True).annotate(
                 prime_cost=Subquery(query_res_spec.values('total_cost')))
         except DatabaseError:
             logger.warning(f"list query error. | {cls.__name__}", exc_info=True)
@@ -483,7 +483,8 @@ class Specifications:
                             raise cls.CantBuildSet()
 
                         else:
-                            _, action = Resources.change_amount(resource, -float(res_spec.amount) * float(amount), operator,
+                            _, action = Resources.change_amount(resource, -float(res_spec.amount) * float(amount),
+                                                                operator,
                                                                 False)
                             resources.append(resource)
                             actions.append(action)
