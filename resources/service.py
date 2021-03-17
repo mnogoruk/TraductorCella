@@ -198,7 +198,7 @@ class Resources:
         if amount_value is None:
             amount_value = .0
 
-        if provider_name is not None:
+        if provider_name is not None and provider_name != '':
             provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
 
         else:

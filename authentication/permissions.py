@@ -8,7 +8,7 @@ RoleChoice = Account.RoleChoice
 class OfficeWorkerPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
-        if settings.DEBUG:
+        if settings.TESTING:
             return True
         if not super().has_permission(request, view):
             return False
@@ -19,7 +19,7 @@ class OfficeWorkerPermission(permissions.IsAuthenticated):
 class StorageWorkerPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
-        if settings.DEBUG:
+        if settings.TESTING:
             return True
         if not super().has_permission(request, view):
             return False
@@ -30,7 +30,7 @@ class StorageWorkerPermission(permissions.IsAuthenticated):
 class AdminPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
-        if settings.DEBUG:
+        if settings.TESTING:
             return True
         if not super().has_permission(request, view):
             return False
@@ -41,7 +41,7 @@ class AdminPermission(permissions.IsAuthenticated):
 class DefaultPermission(permissions.IsAuthenticated):
 
     def has_permission(self, request, view):
-        if settings.DEBUG:
+        if settings.TESTING:
             return True
         if not super().has_permission(request, view):
             return False
