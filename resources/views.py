@@ -124,36 +124,6 @@ class ResourceShortListView(ListAPIView):
             raise QueryError()
 
 
-class ResourceSetCostView(APIView):
-    permission_classes = [OfficeWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        try:
-            r_id = data['id']
-        except KeyError as ex:
-            logger.warning(f"'id' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('id')
-        try:
-            value = float(data['cost'])
-        except KeyError as ex:
-            logger.warning(f"'cost' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('cost')
-        except TypeError as ex:
-            logger.warning(f"'cost' wrong type")
-            raise WrongParameterType('cost', 'float')
-        if value is not None:
-            try:
-                cost, _ = Resources.set_cost(r_id, value, request.user)
-            except Resources.UpdateError:
-                logger.warning(f"Update error | {self.__class__.__name__}")
-                raise UpdateError()
-            return Response(data={'id': r_id, 'cost': cost}, status=status.HTTP_202_ACCEPTED)
-        else:
-            logger.warning(f"Set cost | {self.__class__.__name__}")
-            raise NoParameterSpecified()
-
-
 class ProviderListView(ListAPIView):
     serializer_class = ResourceProviderSerializer
     permission_classes = [DefaultPermission]
@@ -166,7 +136,6 @@ class ProviderListView(ListAPIView):
             raise QueryError()
 
 
-# TODO: ...
 class ResourceExelUploadView(CreateAPIView):
     serializer_class = FileSerializer
     permission_classes = [OfficeWorkerPermission]

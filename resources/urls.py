@@ -1,7 +1,7 @@
 from django.urls import path
 
 from resources.views import ResourceListView, ResourceUpdateView, ResourceCreateView, \
-    ResourceDetailView, ResourceSetCostView, \
+    ResourceDetailView, \
     ResourceShortListView, ProviderListView, ResourceExelUploadView, ResourceBulkDeleteView, \
     ExpiredResourceCount, MakeDeliveryView
 
@@ -10,7 +10,6 @@ urlpatterns = [
     path('create/', ResourceCreateView.as_view()),
     path('edit/<int:r_id>/', ResourceUpdateView.as_view()),
     path('list/', ResourceListView.as_view()),
-    path('set-cost/', ResourceSetCostView.as_view()),
     path('shortlist/', ResourceShortListView.as_view()),
     path('providers/', ProviderListView.as_view()),
     path('upload/', ResourceExelUploadView.as_view()),
