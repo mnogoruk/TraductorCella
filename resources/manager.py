@@ -9,3 +9,4 @@ class ResourceProviderManager(Manager):
         if name is None:
             return ObjectExisting(None, False)
         return GetOrCreateQuery(self.model).get_or_create(name=name)
+
