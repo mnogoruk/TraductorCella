@@ -23,7 +23,7 @@ class Resource(models.Model):
     name = models.CharField(max_length=400)
     external_id = models.CharField(max_length=100, unique=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=.0)
-    amount_limit = models.DecimalField(max_digits=12, decimal_places=2, default=10)
+    amount_limit = models.DecimalField(max_digits=12, decimal_places=2, default=10.0)
     created_at = models.DateTimeField(auto_now_add=True)
     storage_place = models.CharField(max_length=100, null=True)
     comment = models.CharField(max_length=400, null=True)

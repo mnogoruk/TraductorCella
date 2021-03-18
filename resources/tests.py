@@ -18,11 +18,6 @@ class ResourceCreateTest(ResponseTestCaseMixin, APITestCase):
                 "external_id": 1,
             },
             {
-                "name": "resource 2",
-                "external_id": 2,
-                "amount": 20
-            },
-            {
                 "name": "resource 3",
                 "external_id": "3",
                 "amount": 40,
@@ -40,17 +35,17 @@ class ResourceCreateTest(ResponseTestCaseMixin, APITestCase):
                 "provider_name": "Test provider"
             },
             {
-                "name": "resource 6",
-                "external_id": 6,
-                "provider_name": "re",
-            },
-            {
                 "name": "resource 7",
                 "external_id": 7,
-                "cost": '',
-                "amount": '',
-                "amount_limit": '',
+                "cost": None,
+                "amount": None,
+                "amount_limit": None,
                 "provider_name": None
+            },
+            {
+                "name": "resource 8",
+                "external_id": 8,
+                "amount_limit": 100
             }
         ]
         for data in test_data:
