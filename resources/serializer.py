@@ -11,6 +11,27 @@ class ResourceProviderSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CostSerializer(serializers.Serializer):
+    cost = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=.0)
+    id = serializers.CharField()
+
+    def validate_id(self):
+        if not Resource.objects.filter(id=self.id).exists():
+            raise serializers.ValidationError(f"Resource with id {self.id} does not exists")
+
+
+class DeleteResourceSerializer(serializers.Serializer):
+    id = serializers.CharField()
+
+    def validate_id(self):
+        if not Resource.objects.filter(id=self.id).exists():
+            raise serializers.ValidationError(f"Resource with id {self.id} does not exists")
+
+
+class ExpiredCountSerializer(serializers.Serializer):
+    count = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=.0)
+
+
 class ResourceSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True)
     external_id = serializers.CharField(required=True, validators=[
@@ -23,10 +44,24 @@ class ResourceSerializer(serializers.ModelSerializer):
                                           allow_blank=True)
     cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
-    last_change_cost = serializers.DateTimeField(read_only=True)
-    last_change_amount = serializers.DateTimeField(read_only=True)
     storage_place = serializers.CharField(allow_null=True, required=False, allow_blank=True)
     amount_limit = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True, default=10.0)
+    last_delivery_date = serializers.DateTimeField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = Resource
+        fields = [
+            'id',
+            'name',
+            'external_id',
+            'provider',
+            'provider_name',
+            'cost',
+            'amount',
+            'amount_limit',
+            'storage_place',
+            'last_delivery_date'
+        ]
 
     def create(self, validated_data):
         resource = Resources.create(
@@ -67,22 +102,6 @@ class ResourceSerializer(serializers.ModelSerializer):
             Resources.set_amount(instance, amount_value=amount, user=user)
 
         return resource
-
-    class Meta:
-        model = Resource
-        fields = [
-            'id',
-            'name',
-            'external_id',
-            'provider',
-            'provider_name',
-            'cost',
-            'amount',
-            'amount_limit',
-            'storage_place',
-            'last_change_amount',
-            'last_change_cost',
-        ]
 
 
 class ResourceShortSerializer(serializers.ModelSerializer):
