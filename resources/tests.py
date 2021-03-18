@@ -1,5 +1,4 @@
 from rest_framework.test import APITestCase
-from django.forms.models import model_to_dict
 
 from .models import Resource, ResourceProvider
 from utils.test.mixins import ResponseTestCaseMixin
