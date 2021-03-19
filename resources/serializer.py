@@ -118,6 +118,7 @@ class ResourceShortSerializer(serializers.ModelSerializer):
 class ResourceDeliverySerializer(serializers.ModelSerializer):
     provider_name = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
     cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
+    comment = serializers.CharField(max_length=400, allow_null=True, allow_blank=True)
 
     class Meta:
         model = ResourceDelivery
