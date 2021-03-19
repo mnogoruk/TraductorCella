@@ -42,6 +42,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     provider = ResourceProviderSerializer(read_only=True, allow_null=True)
     provider_name = serializers.CharField(write_only=True, required=False, allow_null=True, default=None,
                                           allow_blank=True)
+    comment = serializers.CharField(max_length=400, read_only=True, allow_null=True, allow_blank=True)
     cost = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
     storage_place = serializers.CharField(allow_null=True, required=False, allow_blank=True)
@@ -60,7 +61,8 @@ class ResourceSerializer(serializers.ModelSerializer):
             'amount',
             'amount_limit',
             'storage_place',
-            'last_delivery_date'
+            'last_delivery_date',
+            'comment',
         ]
 
     def create(self, validated_data):

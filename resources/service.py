@@ -257,7 +257,8 @@ class Resources:
         try:
             delivery_query = ResourceDelivery.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
             query = Resource.objects.select_related('provider').annotate(
-                last_delivery_date=Subquery(delivery_query.values('time_stamp')[:1])
+                last_delivery_date=Subquery(delivery_query.values('time_stamp')[:1]),
+                comment=Subquery(delivery_query.values('comment')[:1]),
             )
         except DatabaseError as ex:
             logger.error(f"Error while getting resource list: {ex} | {cls.__name__}", exc_info=True)
