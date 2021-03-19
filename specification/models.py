@@ -27,7 +27,7 @@ class Specification(models.Model):
     coefficient = models.DecimalField(max_digits=12, decimal_places=2, default=None, null=True)
     verified = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    storage_place = models.CharField(max_length=100, null=True)
+    storage_place = models.CharField(max_length=100, null=True, blank=True)
     amount_accuracy = models.CharField(max_length=1, default='X')
 
     def __str__(self):

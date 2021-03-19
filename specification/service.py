@@ -85,10 +85,8 @@ class Specifications:
         if coefficient < 0:
             logger.warning(f"specification coefficient < 0 for specification '{specification.id}' | {cls.__name__}")
 
-
         if save:
             specification.save()
-
 
         return coefficient
 
@@ -103,7 +101,6 @@ class Specifications:
 
         if save:
             specification.save()
-
 
         if send:
             s_p = async_to_sync(cls.send_price)
@@ -131,7 +128,6 @@ class Specifications:
         if save:
             specification.save()
 
-
         return category
 
     @classmethod
@@ -145,15 +141,14 @@ class Specifications:
     def detail(cls, specification):
         try:
             specification = cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
-            query_res_spec = SpecificationResource.objects.filter(specification=specification, resource=OuterRef('pk'))
-            resources = Resource.objects.annotate(
-                res_spec_ex=Exists(query_res_spec.values('id')),
-                needed_amount=Subquery(query_res_spec.values('amount')[:1]))
+            specification_resources = SpecificationResource.objects.select_related('resource').filter(
+                specification=specification)
             reses = []
             prime_cost = 0
-            for resource in resources:
-                reses.append({'resource': resource, 'amount': resource.needed_amount})
-                prime_cost += resource.cost * resource.needed_amount
+
+            for spec_res in specification_resources:
+                reses.append({"resource": spec_res.resource, "amount": spec_res.amount})
+                prime_cost += spec_res.resource.cost * spec_res.amount
 
             specification.resources = reses
             specification.prime_cost = prime_cost
@@ -169,7 +164,7 @@ class Specifications:
             resources_query = Resource.objects.filter(id=OuterRef('resource_id'))
             query_res_spec = SpecificationResource.objects.filter(specification=OuterRef('pk')).values(
                 'specification_id').annotate(
-                total_cost=Sum(Subquery(resources_query.values('cost')[0]) * F('amount')))
+                total_cost=Sum(Subquery(resources_query.values('cost')[:1]) * F('amount')))
             specifications = Specification.objects.select_related('category').annotate(
                 prime_cost=Subquery(query_res_spec.values('total_cost')))
         except DatabaseError:
@@ -198,7 +193,7 @@ class Specifications:
 
     @classmethod
     def create(cls, name: str, product_id: str, price: float = None, coefficient: float = None,
-               resources: List[Dict[str, str]] = None, category_name: str = None, amount: int = None,
+               resources_create: List[Dict[str, str]] = None, category_name: str = None, amount: int = None,
                storage_place=None, amount_accuracy='X',
                user=None):
 
@@ -230,44 +225,33 @@ class Specifications:
 
                 if category_name is not None and category_name != "":
                     category = SpecificationCategory.objects.get_or_create(name=category_name)[0]
-                    category, category_action = cls.set_category(specification, category, operator, False)
-                    actions.append(category_action)
+                    category = cls.set_category(specification, category, operator, False)
                 else:
                     category = None
 
                 if coefficient is not None:
-                    _, coefficient_action = cls.set_coefficient(specification, coefficient, operator, False)
+                    coefficient_action = cls.set_coefficient(specification, coefficient, operator, False)
                     actions.append(coefficient_action)
 
                 elif category is not None and category.coefficient is not None:
-                    _, coefficient_action = cls.set_coefficient(specification, category.coefficient, operator,
-                                                                False)
+                    coefficient_action = cls.set_coefficient(specification, category.coefficient, operator,
+                                                             False)
                     actions.append(coefficient_action)
 
-                _, amount_action = cls.set_amount(specification, amount, operator, False)
+                amount_action = cls.set_amount(specification, amount, operator, False)
                 actions.append(amount_action)
 
-                _, price_action = cls.set_price(specification, price, operator, False)
+                price_action = cls.set_price(specification, price, operator, False)
                 actions.append(price_action)
 
-                if resources is not None and len(resources) != 0:
-                    resource_objects = Resource.objects.prefetch_related('resourcecost_set').filter(
-                        id__in=map(lambda x: x['id'], resources))
-                    res_specs_dict = resource_amounts(resource_objects, resources)
-                    for resource in res_specs_dict:
-                        res = resource['resource']
-                        res.cost = res.resourcecost_set.last().value
+                if resources_create is not None:
 
-                        s = SpecificationResource.objects.create(
-                            resource=res,
-                            amount=resource['amount'],
+                    for resource_create_pair in resources_create:
+                        SpecificationResource.objects.create(
+                            resource_id=resource_create_pair['id'],
+                            amount=resource_create_pair['amount'],
                             specification=specification
                         )
-                        print(s.amount)
-
-                        specification.resources = res_specs_dict
-
-
 
                 specification.save()
 
@@ -355,7 +339,7 @@ class Specifications:
                                 specification=specification
                             )
                         )
-                        _resources.append({'resources': res, 'amount': resource['amount']})
+                        _resources.append({'resources_create': res, 'amount': resource['amount']})
 
                 try:
                     res_specs = SpecificationResource.objects.select_related('resource').filter(
@@ -423,8 +407,9 @@ class Specifications:
                             raise cls.CantBuildSet()
 
                         else:
-                            _, action = Resources.change_amount(resource, -float(res_spec.amount) * float(amount), operator,
-                                                                False)
+                            action = Resources.change_amount(resource, -float(res_spec.amount) * float(amount),
+                                                             operator,
+                                                             False)
                             resources.append(resource)
                             actions.append(action)
 
