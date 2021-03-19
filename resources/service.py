@@ -259,7 +259,7 @@ class Resources:
             query = Resource.objects.select_related('provider').annotate(
                 last_delivery_date=Subquery(delivery_query.values('time_stamp')[:1]),
                 comment=Subquery(delivery_query.values('comment')[:1]),
-            )
+            ).order_by('-created_at')
         except DatabaseError as ex:
             logger.error(f"Error while getting resource list: {ex} | {cls.__name__}", exc_info=True)
             raise cls.QueryError()
