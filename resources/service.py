@@ -7,7 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
-from django.db.models import OuterRef, Subquery, Exists, F, Q, Count, Sum
+from django.db.models import OuterRef, Subquery, F, Q, Count, Sum
 
 from authentication.models import Operator
 from cella.models import File
@@ -49,8 +49,8 @@ class Resources:
         resource.provider = provider
         delivery = cls._create_delivery(resource, provider, cost, amount, comment, time_stamp)
 
-        cost = cls.set_cost(resource, cost, user=user, save=False)
-        amount = cls.change_amount(resource, amount, user=user, save=False)
+        cls.set_cost(resource, cost, user=user, save=True)
+        cls.change_amount(resource, amount, user=user, save=True)
 
         try:
             with transaction.atomic():
@@ -186,6 +186,9 @@ class Resources:
     def detail(cls, resource):
 
         resource = cls.get(resource)
+        resource.last_delivery_date = \
+        ResourceDelivery.objects.values('time_stamp').filter(resource=resource).latest('time_stamp')['time_stamp']
+        print(resource.last_delivery_date)
         return resource
 
     @classmethod
@@ -254,8 +257,7 @@ class Resources:
         try:
             delivery_query = ResourceDelivery.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
             query = Resource.objects.select_related('provider').annotate(
-                last_change_cost=Subquery(delivery_query.values('time_stamp')[:1]),
-                last_change_amount=Subquery(delivery_query.values('time_stamp')[:1]),
+                last_delivery_date=Subquery(delivery_query.values('time_stamp')[:1])
             )
         except DatabaseError as ex:
             logger.error(f"Error while getting resource list: {ex} | {cls.__name__}", exc_info=True)

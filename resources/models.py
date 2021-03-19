@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 from cella.models import Operator
 from .manager import ResourceProviderManager
@@ -41,6 +42,7 @@ class ResourceDelivery(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     comment = models.CharField(max_length=400, null=True)
     time_stamp = models.DateField(null=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def set_resource(self, resource):
         self.resource = resource

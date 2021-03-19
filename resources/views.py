@@ -33,7 +33,7 @@ class ResourceDetailView(RetrieveAPIView):
         r_id = self.kwargs['r_id']
         try:
             resource = Resources.detail(r_id)
-        except Resource.DoesNotExist:
+        except Resources.ResourceDoesNotExist:
             logger.warning(f"Can`t get object 'Resource' with id: {r_id} | {self.__class__.__name__}")
             raise Http404()
 

@@ -46,7 +46,7 @@ class ResourceSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, min_value=0, allow_null=True)
     storage_place = serializers.CharField(allow_null=True, required=False, allow_blank=True)
     amount_limit = serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True, default=10.0)
-    last_delivery_date = serializers.DateTimeField(read_only=True, allow_null=True)
+    last_delivery_date = serializers.DateField(read_only=True, allow_null=True)
 
     class Meta:
         model = Resource
