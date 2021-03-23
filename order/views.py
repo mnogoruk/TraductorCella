@@ -9,7 +9,7 @@ from rest_framework.generics import RetrieveAPIView, ListAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
+from order.serializer import OrderSerializer, OrderDetailSerializer
 from order.service import Orders
 from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError
 from utils.pagination import StandardResultsSetPagination
