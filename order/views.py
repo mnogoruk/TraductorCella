@@ -11,8 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
 from order.service import Orders
-from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError, \
-    AssembleError
+from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 
@@ -67,75 +66,6 @@ class OrderListView(ListAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-
-
-class OrderAssembleSpecificationView(APIView):
-    permission_classes = [StorageWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-
-        try:
-            order_id = data['order_id']
-        except KeyError as ex:
-            logger.warning(f"'order_id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified('order_id')
-        try:
-            specification_id = data['specification_id']
-        except KeyError as ex:
-            logger.warning(f"'specification_id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified('specification_id')
-
-        if order_id is not None and specification_id is not None:
-            try:
-                Orders.assemble_specification(order_id, specification_id)
-                return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
-            except Orders.AssembleError:
-                logger.warning(
-                    f"Assemble info. Specification id: {specification_id}, order id: {order_id} | "
-                    f"{self.__class__.__name__}", exc_info=True)
-                raise AssembleError()
-        else:
-            if order_id is None:
-                logger.warning(f"order id is not specified | {self.__class__.__name__}")
-            if specification_id is None:
-                logger.warning(f"specification id is not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified()
-
-
-class OrderDisAssembleSpecificationView(APIView):
-    permission_classes = [StorageWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-
-        try:
-            order_id = data['order_id']
-        except KeyError as ex:
-            logger.warning(f"'order_id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified('order_id')
-
-        try:
-            specification_id = data.get('specification_id', None)
-        except KeyError as ex:
-            logger.warning(f"'specification_id' not specified | {self.__class__.__name__}", exc_info=True)
-
-            raise NoParameterSpecified('specification_id')
-
-        if order_id is not None and specification_id is not None:
-            try:
-                Orders.disassemble_specification(order_id, specification_id)
-                return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
-            except Orders.AssembleError:
-                logger.warning(
-                    f"Disassemble info. Specification id: {specification_id}, order id: {order_id} | "
-                    f"{self.__class__.__name__}", exc_info=True)
-        else:
-            if order_id is None:
-                logger.warning(f"order id is None | {self.__class__.__name__}")
-            if specification_id is None:
-                logger.warning(f"specification id None | {self.__class__.__name__}")
-            raise NoParameterSpecified()
 
 
 class OrderManageActionView(APIView):

@@ -10,11 +10,9 @@ from django.db import IntegrityError, transaction, DatabaseError
 from django.db.models import Count, Q
 
 from order.models import Order, OrderSource, OrderSpecification
-from resources.service import Resources
 from specification.models import Specification
 from specification.service import Specifications
 from utils.function import product_amounts
-from authentication.models import Operator
 
 logger = logging.getLogger(__name__)
 
@@ -66,17 +64,12 @@ class Orders:
                 Order.OrderStatus.ARCHIVED
             ]
         ).order_by('status')
-
         return orders
 
     @classmethod
     def add_assembling_info(cls, orders):
         for order in orders:
-            if order.status in [Order.OrderStatus.INACTIVE]:
-                m, n = cls.assembling_info(order)
-            else:
-                m = 0
-                n = 0
+            m, n = cls.assembling_info(order)
             order.missing_resources = n
             order.missing_specifications = m
         return orders
@@ -113,6 +106,7 @@ class Orders:
                     if resources[resource.id][0] < resources[resource.id][1]:
                         miss_resources.add(resource.id)
                         miss_specification.add(specification.id)
+
         except Exception:
             logger.warning(f"Assemble info error. order: {order} | {cls.__name__}", exc_info=True)
             raise cls.AssembleError()
@@ -129,181 +123,57 @@ class Orders:
         m, n = cls.assembling_info(order)
         order.missing_resources = n
         order.missing_specifications = m
-
         return order
 
     @classmethod
-    def assemble_specification(cls, order, specification, user=None):
-        order = cls.get(order)
-        specification = Specifications.get(specification)
-
-        if not (order.status == Order.OrderStatus.ACTIVE or order.status == Order.OrderStatus.ASSEMBLING):
-            logger.warning(
-                f"Can't assemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
-            raise cls.AssembleError()
-
-        operator = Operator.objects.get_or_create_operator(user)
-        try:
-            OrderSpecification.objects.filter(specification=specification, order=order).update(assembled=True)
-
-            if order.status == Order.OrderStatus.ACTIVE:
-                cls._assembling(order, operator)
-
-            if not OrderSpecification.objects.filter(order=order, assembled=False).exists():
-                cls._ready(order, operator)
-            order.save()
-        except DatabaseError:
-            logger.warning(f"Assembling specification error. Order: {order} | {cls.__name__}", exc_info=True)
-            raise cls.AssembleError()
-
-    @classmethod
-    def disassemble_specification(cls, order, specification, user=None):
-        order = cls.get(order)
-        specification = Specifications.get(specification)
-
-        if not (order.status == Order.OrderStatus.READY or order.status == Order.OrderStatus.ASSEMBLING):
-            logger.warning(
-                f"Can't disassemble specification. Order status: {order.status}. Order: {order} | {cls.__name__}")
-            raise cls.AssembleError()
-
-        try:
-
-            operator = Operator.objects.get_or_create_operator(user)
-
-            OrderSpecification.objects.filter(specification=specification, order=order).update(assembled=False)
-
-            if order.status == Order.OrderStatus.READY:
-                cls._assembling(order, operator)
-
-            if not OrderSpecification.objects.filter(order=order, assembled=True).exists():
-                cls._activate(order, operator)
-
-            order.save()
-        except DatabaseError:
-            logger.warning(f"Disassembling specification error | {cls.__name__}", exc_in=True)
-            raise cls.AssembleError()
-
-    @classmethod
-    def delete(cls, order, user):
+    def delete(cls, order, user=None):
         order = cls.get(order)
         order.delete()
 
     @classmethod
-    def bulk_delete(cls, ids, user):
+    def bulk_delete(cls, ids, user=None):
         Order.objects.filter(id__in=ids).delete()
 
     @classmethod
-    def confirm(cls, order, user):
-        try:
-            order = cls.get(order)
-            if not order.status == Order.OrderStatus.READY:
-                logger.warning(f"Cant confirm order with status {order.status}. Order: {order} | {cls.__name__}")
-                raise cls.ActionError()
-            cls._confirm(order, Operator.objects.get_or_create_operator(user))
-            order.save()
-
-            ch_s = async_to_sync(cls.change_status)
-            ch_s(order.external_id, 'DF')
-        except Exception:
-            logger.warning("")
-            raise cls.ActionError()
-
-    @classmethod
-    def cancel(cls, order, user):
-        order = cls.get(order)
-        if order.status in [Order.OrderStatus.READY, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.ACTIVE]:
-            cls.deactivate(order, user)
-            cls._cancel(order, user)
-        elif order.status in [Order.OrderStatus.CANCELED, Order.OrderStatus.ARCHIVED, Order.OrderStatus.CONFIRMED]:
-            logger.warning(f"Can't cancel order with status {order.status}. Order: {order} | {cls.__name__}")
-            raise cls.ActionError()
-        elif order.status == Order.OrderStatus.INACTIVE:
-            cls._cancel(order, user)
-        else:
-            logger.warning(f"Can't cancel order. Unexpected status {order.status}. Order: {order} | {cls.__name__}")
-
-    @classmethod
-    def activate(cls, order, user):
-        order = Order.objects.prefetch_related(
-            'order_specification',
-            'order_specification__specification',
-            'order_specification__specification__res_specs',
-            'order_specification__specification__res_specs__resource',
-        ).get(id=order)
-
-        if not order.status == Order.OrderStatus.INACTIVE:
-            logger.warning(f"Can't activate order with status {order.status}. Order: {order} | {cls.__name__}")
-            raise cls.ActionError()
-
-        order_specs = order.order_specification
-        operator = Operator.objects.get_or_create_operator(user)
-
+    def confirm(cls, order, user=None):
         try:
             with transaction.atomic():
-                for order_spec in order_specs.all():
-                    specification = order_spec.specification
-                    res_specs = specification.res_specs
-
-                    if specification.amount > order_spec.amount:
-                        Specifications.set_amount(specification, specification.amount - order_spec.amount, operator)
-                        continue
-
+                order = cls.get(order)
+                for order_specification in order.order_specifications.all():
+                    specification = order_specification.specification
+                    if specification.amount >= order_specification.amount:
+                        specification.amount -= order_specification.amount
                     else:
-                        storage_amount = specification.amount
-                        Specifications.set_amount(specification, 0, operator, False)
-
-                    for res_spec in res_specs.all():
-                        resource = res_spec.resource
-                        amount = resource.amount
-                        if amount >= res_spec.amount * (order_spec.amount - storage_amount):
-                            Resources.change_amount(resource,
-                                                    - (res_spec.amount * (order_spec.amount - storage_amount)),
-                                                    operator)
-
-                        else:
-                            logger.warning(f"Can`t assemble Order. Not enough resources")
-                            raise cls.ActionError(f"resource {resource.name}, amount {amount}")
-
+                        missing_amount = order_specification.amount - specification.amount
+                        specification.amount = 0
+                        for specification_resource in specification.res_specs.all():
+                            resource = specification_resource.resource
+                            resource.amount -= specification_resource.amount * missing_amount
+                            resource.save()
+                    Specifications.notify_new_amount(specification)
                     specification.save()
-
-                cls._activate(order, Operator.objects.get_or_create_operator(user))
+                order.confirm()
                 order.save()
-            ch_s = async_to_sync(cls.change_status)
-            ch_s(order.external_id, 'S')
-        except DatabaseError:
-            logger.warning(f"Activation error. Order: {order} | {cls.__name__}", exc_info=True)
-            raise cls.ActionError()
+                cls.notify_new_status(order)
+        except Exception:
+            logger.error(f"Error while confirming order: {order} | {cls.__name__}", exc_info=True)
+            raise cls.ActionError(f"Error while confirming order: {order} | {cls.__name__}")
 
     @classmethod
-    def deactivate(cls, order, user):
-        order = cls.get(order)
-        operator = Operator.objects.get_or_create_operator(user)
+    def cancel(cls, order, user=None):
+        order.cancel()
+        order.save()
+        cls.notify_new_status(order)
 
-        if order.status not in [Order.OrderStatus.ACTIVE, Order.OrderStatus.ASSEMBLING, Order.OrderStatus.READY]:
-            logger.warning(f"Can't deactivate order with status {order.status}. Order: {order} | {cls.__name__}",
-                           exc_info=True)
-            raise cls.ActionError()
+    @classmethod
+    def archive(cls, order, user=None):
+        order.archive()
+        order.save()
 
-        order_specs = order.order_specification
-        try:
-            for order_spec in order_specs.all():
-                specification = order_spec.specification
-                res_specs = specification.res_specs
-                order_spec.assembled = False
-                order_spec.save()
-
-                for res_spec in res_specs.all():
-                    resource = res_spec.resource
-                    Resources.change_amount(resource, res_spec.amount * order_spec.amount, operator)
-
-            cls._deactivate(order, Operator.objects.get_or_create_operator(user))
-            order.save()
-
-            ch_s = async_to_sync(cls.change_status)
-            ch_s(order.external_id, 'P')
-        except DatabaseError:
-            logger.warning(f"Can't deactivate order. Order: {order} | {cls.__name__}", exc_info=True)
-            raise cls.ActionError()
+    @classmethod
+    def notify_new_status(cls, order):
+        request_body = cls.form_request_body_for_changed_status(order)
+        async_to_sync(send_status)(request_body)
 
     @classmethod
     def create(cls, external_id, source: str = None, products: List[Dict[str, str]] = None, user=None):
@@ -326,8 +196,6 @@ class Orders:
                         specification = Specification.objects.get_or_create(product_id=product['product_id'],
                                                                             is_active=True)[0]
                         specifications_objects.append(specification)
-                    # specifications_objects = Specification.objects.filter(
-                    #     product_id__in=map(lambda x: x['product_id'], products), is_active=True)
                     order_specs_dict = product_amounts(specifications_objects, products)
 
                     for product in order_specs_dict:
@@ -351,53 +219,34 @@ class Orders:
     def status_count(cls):
         count = Order.objects.aggregate(
             inactive=Count('id', filter=Q(status=Order.OrderStatus.INACTIVE)),
-            active=Count('id', filter=Q(status=Order.OrderStatus.ACTIVE)),
-            assembling=Count('id', filter=Q(status=Order.OrderStatus.ASSEMBLING)),
-            ready=Count('id', filter=Q(status=Order.OrderStatus.READY)),
+            canceld=Count('id', filter=Q(status=Order.OrderStatus.CANCELED)),
+            confirmed=Count('id', filter=Q(status=Order.OrderStatus.CONFIRMED)),
         )
         return count
 
     @classmethod
-    def _activate(cls, order, operator):
-        order.status = Order.OrderStatus.ACTIVE
+    def form_request_body_for_changed_status(cls, order):
+        body = {"ID": order.external_id}
+        if order.canceled():
+            body['cancel'] = True
+        elif order.confirmed():
+            body['ship'] = True
+        else:
+            raise ValueError(f"Wrong status for forming request body. Status: {order.status}")
+        return body
 
     @classmethod
-    def _deactivate(cls, order, operator):
-        order.status = Order.OrderStatus.INACTIVE
-
-    @classmethod
-    def _assembling(cls, order, operator):
-        order.status = Order.OrderStatus.ASSEMBLING
-
-    @classmethod
-    def _ready(cls, order, operator):
-        order.status = Order.OrderStatus.READY
-
-    @classmethod
-    def _confirm(cls, order, operator):
-        order.status = Order.OrderStatus.CONFIRMED
-
-    @classmethod
-    def _archive(cls, order, operator):
-        order.status = Order.OrderStatus.ARCHIVED
-
-    @classmethod
-    def _cancel(cls, order, operator):
-        order.status = Order.OrderStatus.CANCELED
-
-    @classmethod
-    async def change_status(cls, order_id, status):
-        return asyncio.create_task(change_status(order_id, status))
+    async def change_status(cls, body):
+        return asyncio.create_task(send_status(body))
 
 
 bitrix_url = settings.BITRIX_URL + "ajax/smenastatusa.php"
 
 
-async def change_status(order_id, status):
+async def send_status(body: dict):
     async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(**settings.BITRIX_AUF_CONF)) as session:
-        logger.info(f"send changed status. id: {order_id}, status: {status}")
         headers = {'content-type': 'application/json'}
         try:
-            await session.post(bitrix_url, json={"ID": order_id, "status": status}, headers=headers)
+            await session.post(bitrix_url, json=body, headers=headers)
         except Exception as ex:
             logger.error("Error while posting new status", exc_info=True)

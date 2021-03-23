@@ -358,6 +358,18 @@ class Specifications:
         return specification
 
     @classmethod
+    def notify_new_price(cls, specification):
+        pass
+
+    @classmethod
+    def notify_new_prime_cost(cls, specification):
+        pass
+
+    @classmethod
+    def notify_new_amount(cls, amount):
+        pass
+
+    @classmethod
     def assemble_info(cls, specification):
         specification = cls.get(specification, prefetched=['res_specs', 'res_specs__resource'])
 

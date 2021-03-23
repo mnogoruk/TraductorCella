@@ -15,9 +15,6 @@ class OrderSource(models.Model):
 class Order(models.Model):
     class OrderStatus(models.TextChoices):
         INACTIVE = 'INC', 'Inactive'
-        ACTIVE = 'ACT', 'Active'
-        ASSEMBLING = 'ASS', 'Assembling'
-        READY = 'RDY', 'Ready'
         ARCHIVED = 'ARC', 'Archived'
         CONFIRMED = 'CNF', 'Confirmed'
         CANCELED = 'CND', 'Canceled'
@@ -27,12 +24,30 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     source = models.ForeignKey(OrderSource, on_delete=models.SET_NULL, null=True)
 
+    def canceled(self):
+        return self.status == Order.OrderStatus.CANCELED
+
+    def archived(self):
+        return self.status == Order.OrderStatus.ARCHIVED
+
+    def confirmed(self):
+        return self.status == Order.OrderStatus.CONFIRMED
+
+    def confirm(self):
+        self.status = Order.OrderStatus.CONFIRMED
+
+    def archive(self):
+        self.status = Order.OrderStatus.ARCHIVED
+
+    def cancel(self):
+        self.status = Order.OrderStatus.CANCELED
+
     def __str__(self):
         return f"{self.external_id}"
 
 
 class OrderSpecification(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_specification')
-    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='order_specification')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_specifications')
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='order_specifications')
     amount = models.IntegerField()
     assembled = models.BooleanField(default=False)
