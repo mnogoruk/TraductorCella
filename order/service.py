@@ -37,6 +37,10 @@ class Orders:
         pass
 
     @classmethod
+    def get_by_external_id(cls, external_id):
+        return Order.objects.get(external_id=external_id)
+
+    @classmethod
     def get(cls, order):
         if not isinstance(order, Order):
             try:
@@ -154,7 +158,6 @@ class Orders:
                     specification.save()
                 order.confirm()
                 order.save()
-                cls.notify_new_status(order)
         except Exception:
             logger.error(f"Error while confirming order: {order} | {cls.__name__}", exc_info=True)
             raise cls.ActionError(f"Error while confirming order: {order} | {cls.__name__}")
@@ -163,7 +166,6 @@ class Orders:
     def cancel(cls, order, user=None):
         order.cancel()
         order.save()
-        cls.notify_new_status(order)
 
     @classmethod
     def archive(cls, order, user=None):
@@ -174,6 +176,21 @@ class Orders:
     def notify_new_status(cls, order):
         request_body = cls.form_request_body_for_changed_status(order)
         async_to_sync(send_status)(request_body)
+
+    @classmethod
+    def change(cls, external_id, source: str = None, products: List[Dict[str, str]] = None, user=None):
+        try:
+            with transaction.atomic():
+                order = Order.objects.get(external_id=external_id)
+                if source is None:
+                    source = order.source
+                order.delete()
+                cls.create(external_id, source, products, user)
+
+        except DatabaseError as ex:
+            logger.warning(f"Change error | {cls.__name__}", exc_info=True)
+            raise cls.EditError(ex)
+        return order
 
     @classmethod
     def create(cls, external_id, source: str = None, products: List[Dict[str, str]] = None, user=None):

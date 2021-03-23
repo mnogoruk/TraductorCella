@@ -88,14 +88,14 @@ class OrderManageActionView(APIView):
 
         if order_id is not None and action is not None:
             try:
-                if action == 'activate':
-                    Orders.activate(order_id, request.user)
-                elif action == 'deactivate':
-                    Orders.deactivate(order_id, request.user)
-                elif action == 'confirm':
-                    Orders.confirm(order_id, request.user)
+                if action == 'confirm':
+                    order = Orders.get(order_id)
+                    Orders.confirm(order, request.user)
+                    Orders.notify_new_status(order)
                 elif action == 'cancel':
-                    Orders.cancel(order_id, request.user)
+                    order = Orders.get(order_id)
+                    Orders.cancel(order, request.user)
+                    Orders.notify_new_status(order)
                 else:
                     raise WrongParameterValue('action')
             except Orders.ActionError:
@@ -152,18 +152,40 @@ class OrderCreateView(CreateAPIView):
         return serializer.save(request=self.request)
 
 
-class ReceiveOrderView(CreateAPIView):
-    serializer_class = OrderGetSerializer
+class ReceiveOrderView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (BasicAuthentication,)
 
-    def perform_create(self, serializer):
-        return serializer.save(request=self.request)
-
     def post(self, request, *args, **kwargs):
         logger.info(f"Received order {request.data} | {self.__class__.__name__}")
+        data = request.data
+        external_id = data['ID']
+
         try:
-            self.create(request, *args, **kwargs)
+            if 'create' in data:
+                specifications = data['products']
+                products = []
+
+                for specification in specifications:
+                    product = dict(product_id=specification['id'], amount=specification['amount'])
+                    products.append(product)
+
+                Orders.create(external_id=external_id, source='bitrix', products=products)
+            elif 'ship' in data:
+                Orders.confirm(external_id)
+            elif 'cancel' in data:
+                Orders.cancel(external_id)
+            elif 'change' in data:
+
+                specifications = data['products']
+                products = []
+
+                for specification in specifications:
+                    product = dict(product_id=specification['id'], amount=specification['amount'])
+                    products.append(product)
+
+                Orders.change(external_id=external_id, products=products)
+
             return Response(data={'received': True}, status=status.HTTP_202_ACCEPTED)
         except Exception as ex:
             return Response(data={'received': False}, status=status.HTTP_400_BAD_REQUEST)
