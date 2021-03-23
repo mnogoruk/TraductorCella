@@ -54,10 +54,10 @@ class Orders:
     @classmethod
     def list(cls):
         orders = Order.objects.prefetch_related(
-            'order_specification',
-            'order_specification__specification',
-            'order_specification__specification__res_specs',
-            'order_specification__specification__res_specs__resource'
+            'order_specifications',
+            'order_specifications__specification',
+            'order_specifications__specification__res_specs',
+            'order_specifications__specification__res_specs__resource'
 
         ).exclude(
             status__in=[
@@ -78,17 +78,17 @@ class Orders:
     def assembling_info(cls, order):
         if not isinstance(order, Order):
             order = Order.objects.prefetch_related(
-                'order_specification',
-                'order_specification__specification',
-                'order_specification__specification__res_specs',
-                'order_specification__specification__res_specs__resource'
+                'order_specifications',
+                'order_specifications__specification',
+                'order_specifications__specification__res_specs',
+                'order_specifications__specification__res_specs__resource'
             ).get(id=order)
 
         resources = {}
         miss_resources = set()
         miss_specification = set()
         try:
-            for order_spec in order.order_specification.all():
+            for order_spec in order.order_specifications.all():
                 specification = order_spec.specification
 
                 for res_spec in specification.res_specs.all():
@@ -115,10 +115,10 @@ class Orders:
     @classmethod
     def detail(cls, order):
         order = Order.objects.prefetch_related(
-            'order_specification',
-            'order_specification__specification',
-            'order_specification__specification__res_specs',
-            'order_specification__specification__res_specs__resource',
+            'order_specifications',
+            'order_specifications__specification',
+            'order_specifications__specification__res_specs',
+            'order_specifications__specification__res_specs__resource',
         ).get(id=order)
         m, n = cls.assembling_info(order)
         order.missing_resources = n

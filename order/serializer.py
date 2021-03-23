@@ -39,7 +39,7 @@ class OrderSourceSerializer(serializers.ModelSerializer):
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
-    order_specification = OrderDetailSpecificationSerializer(many=True, read_only=True)
+    order_specifications = OrderDetailSpecificationSerializer(many=True, read_only=True)
 
     missing_resources = serializers.ListField(read_only=True, allow_null=True)
     missing_specifications = serializers.ListField(read_only=True, allow_null=True)
@@ -50,7 +50,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    order_specification = OrderSpecificationSerializer(many=True, read_only=True)
+    order_specifications = OrderSpecificationSerializer(many=True, read_only=True, allow_null=True)
     specifications_create = OrderSpecificationCreateUpdateSerializer(write_only=True, many=True)
     source = OrderSourceSerializer(read_only=True)
     source_name = serializers.CharField(max_length=100, write_only=True, allow_null=True, required=False,
