@@ -8,14 +8,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction, DatabaseError
 import logging
 import pandas as pd
-from django.db.models import OuterRef, Subquery, Exists, F, Q, Count, Sum
+from django.db.models import OuterRef, Subquery, F, Q, Count, Sum
 
+from authentication.models import Operator
 from cella.models import File
-from cella.service import Operators
 from specification.models import Specification, SpecificationResource
 from utils.function import random_str
 
-from .models import Resource, ResourceCost, ResourceProvider, ResourceAction, ResourceDelivery
+from .models import Resource, ResourceProvider, ResourceDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -58,31 +58,13 @@ class Resources:
         resource.provider = provider
         delivery = cls._create_delivery(resource, provider, cost, amount, comment, time_stamp, name)
 
-        cost, cost_action = cls.set_cost(resource, cost, user=user, save=False)
-        amount, amount_action = cls.change_amount(resource, amount, user=user, save=False)
-        cost_action.time_stamp = datetime(
-            year=time_stamp.year,
-            month=time_stamp.month,
-            day=time_stamp.day,
-        )
-        print(cost_action.time_stamp)
-        amount_action.time_stamp = datetime(
-            year=time_stamp.year,
-            month=time_stamp.month,
-            day=time_stamp.day,
-        )
-        cost.time_stamp = datetime(
-            year=time_stamp.year,
-            month=time_stamp.month,
-            day=time_stamp.day,
-        )
+        cls.set_cost(resource, cost, user=user, save=True)
+        cls.change_amount(resource, amount, user=user, save=True)
+
         try:
             with transaction.atomic():
                 delivery.save()
                 resource.save()
-                cost.save()
-                cost_action.save()
-                amount_action.save()
         except Exception as ex:
             logger.error(f"make delivery error | {cls.__name__}", exc_info=True)
 
@@ -110,7 +92,7 @@ class Resources:
         if not isinstance(resource, Resource):
             try:
                 return Resource.objects.select_related(*related).prefetch_related(*prefetched).get(id=resource)
-            except IntegrityError:
+            except Resource.DoesNotExist:
                 logger.warning(f"Resource does not exist. Id: '{resource}'")
                 raise cls.ResourceDoesNotExist()
         else:
@@ -124,18 +106,10 @@ class Resources:
         if amount_value < 0:
             logger.warning(f"resources amount < 0 for resources '{resource.id}'")
 
-        action = ResourceAction(
-            resource=resource,
-            action_type=ResourceAction.ActionType.SET_AMOUNT,
-            operator=Operators.get_operator(user),
-            value=str(amount_value)
-        )
-
         if save:
             resource.save()
-            action.save()
 
-        return amount_value, action
+        return amount_value
 
     @classmethod
     def change_amount(cls, resource, delta_amount, user=None, save=True):
@@ -143,19 +117,12 @@ class Resources:
 
         resource.amount = float(resource.amount) + float(delta_amount)
         if resource.amount < 0:
-            logger.warning(f"resources amount < 0 for resources '{resource}'")
-        action = ResourceAction(
-            resource=resource,
-            action_type=ResourceAction.ActionType.CHANGE_AMOUNT,
-            operator=Operators.get_operator(user),
-            value=str(delta_amount)
-        )
+            logger.warning(f"resources amount < 0 for resources '{resource.id}'")
 
         if save:
             resource.save()
-            action.save()
 
-        return resource.amount, action
+        return resource.amount
 
     @classmethod
     def set_cost(cls, resource, cost_value, user, save=True, verified=False, send=False):
@@ -170,31 +137,18 @@ class Resources:
 
         else:
             resource = cls.get(resource)
-
+        resource.cost = cost_value
         if cost_value < 0:
             logger.warning(f"resources cost < 0 for resources '{resource.id}'")
-        cost = ResourceCost(
-            resource=resource,
-            value=cost_value,
-            verified=verified
-        )
-
-        action = ResourceAction(
-            resource=resource,
-            action_type=ResourceAction.ActionType.SET_COST,
-            operator=Operators.get_operator(user),
-            value=str(cost_value)
-        )
 
         if save:
-            cost.save()
-            action.save()
-            query_cost = ResourceCost.objects.filter(resource_id=OuterRef('resource_id')).order_by('-time_stamp')
+            resource.save()
+            query_cost = Resource.objects.filter(id=OuterRef('resource_id'))
 
             query_res_spec = SpecificationResource.objects.filter(
                 specification=OuterRef('pk'),
             ).values('specification_id').annotate(
-                total_cost=Sum(Subquery(query_cost.values('value')[:1]) * F('amount')))
+                total_cost=Sum(Subquery(query_cost.values('cost')) * F('amount')))
 
             specifications = Specification.objects.filter(res_specs__resource=resource).annotate(
                 prime_cost=Subquery(query_res_spec.values('total_cost'))).values('product_id', 'prime_cost')
@@ -202,7 +156,7 @@ class Resources:
             spc = async_to_sync(cls.send_prime_cost)
 
             spc(specifications)
-        return cost, action
+        return cost_value
 
     @classmethod
     def expired_count(cls):
@@ -214,7 +168,7 @@ class Resources:
     def update_fields(cls, resource, resource_name=None, external_id=None, provider_name: str = None, user=None):
 
         resource = cls.get(resource)
-        operator = Operators.get_operator(user)
+        operator = Operator.objects.get_or_create_operator(user)
         value_data = []
         try:
             with transaction.atomic():
@@ -231,13 +185,7 @@ class Resources:
                 if len(value_data) == 0:
                     logger.warning(f"No fields updated for resources with id '{resource.id}'")
                     return cls.detail(resource)
-                else:
-                    ResourceAction.objects.create(
-                        resource=resource,
-                        action_type=ResourceAction.ActionType.UPDATE_FIELDS,
-                        operator=operator,
-                        value="|".join(value_data)
-                    )
+
         except DatabaseError:
             logger.warning(f"Update error | {cls.__name__}", exc_info=True)
             raise cls.UpdateError()
@@ -248,20 +196,16 @@ class Resources:
     def detail(cls, resource):
 
         resource = cls.get(resource)
-        try:
-            cost = ResourceCost.objects.filter(resource=resource).latest('created_at')
-        except ResourceCost.DoesNotExist:
-            logger.warning(f"ResourceCost does not exist for Resource '{resource}' | {cls.__name__}", exc_info=True)
-            cost = ResourceCost.objects.create(resource=resource, value=0)
 
-        resource.cost = cost.value
-        resource.verified = cost.verified
+        resource.last_delivery_date = \
+            ResourceDelivery.objects.values('time_stamp').filter(resource=resource).latest('time_stamp')['time_stamp']
+        print(resource.last_delivery_date)
 
         return resource
 
     @classmethod
     def create(cls, resource_name: str, external_id: str, cost_value: float = 0, amount_value: float = 0,
-               provider_name: str = None, storage_place=None, user=None):
+               provider_name: str = None, storage_place=None, user=None, amount_limit=10.0):
 
         if cost_value is None:
             cost_value = .0
@@ -269,7 +213,10 @@ class Resources:
         if amount_value is None:
             amount_value = .0
 
-        if provider_name is not None:
+        if amount_limit is None:
+            amount_limit = 10.0
+
+        if provider_name is not None and provider_name != '':
             provider = ResourceProvider.objects.get_or_create(name=provider_name)[0]
 
         else:
@@ -282,27 +229,18 @@ class Resources:
                                                        external_id=external_id,
                                                        provider=provider,
                                                        amount=amount_value,
-                                                       storage_place=storage_place)
+                                                       storage_place=storage_place,
+                                                       cost=cost_value,
+                                                       amount_limit=amount_limit)
 
-                except IntegrityError:
+                except IntegrityError as ex:
                     logger.warning(f"Not unique external id '{external_id}'")
-                    raise cls.ExternalIdUniqueError()
+                    raise cls.ExternalIdUniqueError(ex)
 
-                operator = Operators.get_operator(user)
+                operator = Operator.objects.get_or_create_operator(user)
 
-                ResourceAction(
-                    resource=resource,
-                    action_type=ResourceAction.ActionType.CREATE,
-                    operator=operator
-                ).save()
-
-                cost, cost_action = cls.set_cost(resource, cost_value, operator, True, True)
-                amount, amount_action = cls.set_amount(resource, amount_value, operator)
-
-                resource.cost = cost.value
-                resource.cost_time_stamp = cost.time_stamp
-                resource.amount_time_stamp = amount_action.time_stamp
-                resource.verified = cost.verified
+                cost = cls.set_cost(resource, cost_value, operator, True, True)
+                amount = cls.set_amount(resource, amount_value, operator)
 
         except DatabaseError as ex:
             logger.warning(f"Create error resource_name={resource_name}, external_id={external_id}, "
@@ -317,7 +255,7 @@ class Resources:
         # TODO: test, optimize
         errors = []
         for resource in data:
-            resource['user'] = user
+            resource['applicant'] = user
             try:
                 cls.create(**resource)
             except cls.ExternalIdUniqueError as ex:
@@ -329,67 +267,25 @@ class Resources:
     @classmethod
     def list(cls):
         try:
-            cost_qr = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-created_at')
+            delivery_query = ResourceDelivery.objects.filter(resource=OuterRef('pk')).order_by('-time_stamp')
             query = Resource.objects.select_related('provider').annotate(
-                cost=Subquery(cost_qr.values('value')[:1]),
-                last_change_cost=Subquery(cost_qr.values('time_stamp')[:1]),
-                last_change_amount=Subquery(cost_qr.values('time_stamp')[:1]),
-                verified=Subquery(cost_qr.values('verified')[:1]),
-            )
+                last_delivery_date=Subquery(delivery_query.values('time_stamp')[:1]),
+                comment=Subquery(delivery_query.values('comment')[:1]),
+            ).order_by('-created_at')
         except DatabaseError as ex:
             logger.error(f"Error while getting resource list: {ex} | {cls.__name__}", exc_info=True)
             raise cls.QueryError()
 
-        return query.order_by('verified')
+        return query
 
     @classmethod
     def shortlist(cls):
-        query_cost = ResourceCost.objects.filter(resource=OuterRef('pk')).order_by('-created_at')
-        query = Resource.objects.select_related('provider').annotate(
-            cost=Subquery(query_cost.values('value')[:1])).order_by('name')
+        query = Resource.objects.select_related('provider')
         return query
 
     @classmethod
     def providers(cls):
         return ResourceProvider.objects.all()
-
-    @classmethod
-    def with_unverified_cost(cls):
-        try:
-            cost_ver_qr = ResourceCost.objects.filter(resource=OuterRef('pk'), verified=True).order_by('-time_stamp')
-            cost_unver_qr = ResourceCost.objects.filter(resource=OuterRef('pk'), verified=False).order_by('-time_stamp')
-            amount_action = ResourceAction.objects.filter(
-                resource=OuterRef('pk'),
-                action_type__in=[ResourceAction.ActionType.SET_AMOUNT, ResourceAction.ActionType.CHANGE_AMOUNT]
-            ).order_by('-time_stamp')
-            query = Resource.objects.select_related('provider').annotate(
-                verified=~Exists(cost_unver_qr),
-                old_cost=Subquery(cost_ver_qr.values('value')[:1]),
-                new_cost=Subquery(cost_unver_qr.values('value')[:1]),
-                last_change_cost=Subquery(cost_unver_qr.values('time_stamp')[:1]),
-                last_change_amount=Subquery(amount_action.values_list('time_stamp')[:1])
-            ).filter(verified=False)
-            return query
-        except DatabaseError as ex:
-            logger.error(f"Database error: {ex} | {cls.__name__}", exc_info=True)
-            raise cls.QueryError()
-
-    @classmethod
-    def verify_cost(cls, ids, user):
-        with transaction.atomic():
-            resources = Resource.objects.filter(id__in=ids)
-            for resource in resources:
-                costs = ResourceCost.objects.filter(resource=resource, verified=False).update(verified=True)
-                ResourceAction.objects.create(
-                    resource=resource,
-                    action_type=ResourceAction.ActionType.VERIFY_COST,
-                    operator=Operators.get_operator(user)
-                )
-        return costs
-
-    @classmethod
-    def actions(cls, r_id):
-        return ResourceAction.objects.filter(resource_id=r_id).order_by('-time_stamp')
 
     @classmethod
     def delete(cls, resource, user):
@@ -419,7 +315,7 @@ async def create_from_excel(file_instance_id, operator_id=None):
         logger.warning(f"Error while reading excel file {file_instance_id}", exc_info=True)
         raise
     try:
-        operator = await (sync_to_async(Operators.get_operator)(operator_id))
+        operator = await (sync_to_async(Operator.objects.get_or_create_operator)(operator_id))
         actions = []
         costs = []
         provider_dict = {}
@@ -463,27 +359,17 @@ async def create_from_excel(file_instance_id, operator_id=None):
                         provider = provider_dict[provider_name]
 
                 obj['provider'] = provider
-                resource = await (sync_to_async(Resource.objects.create)(**obj))
+                resource = Resource(**obj)
                 if pd.isnull(row['Цена']):
                     cost_value = 0
                 else:
                     cost_value = row['Цена']
-                cost, cost_action = Resources.set_cost(resource, cost_value, operator, verified=True, save=False)
-                amount, amount_action = Resources.set_amount(resource, amount_value, operator, save=False)
-                create_action = ResourceAction(
-                    resource=resource,
-                    operator=operator,
-                    action_type=ResourceAction.ActionType.CREATE)
+                await sync_to_async(Resources.set_cost)(resource, cost_value, operator, verified=True, save=False)
+                await sync_to_async(Resources.set_amount)(resource, amount_value, operator, save=False)
 
-                costs.append(cost)
-                actions.append(cost_action)
-                actions.append(amount_action)
-                actions.append(create_action)
                 resources.append(resource)
 
-        group = asyncio.gather((sync_to_async(ResourceCost.objects.bulk_create)(costs)),
-                               (sync_to_async(ResourceAction.objects.bulk_create)(actions)),
-                               (sync_to_async(Resource.objects.bulk_update)(resources, fields=['amount'])))
+        group = asyncio.gather((sync_to_async(Resource.objects.bulk_create)(resources)))
         await group
     except Exception as ex:
         logger.warning(f"Error while creating resources from excel", exc_info=True)

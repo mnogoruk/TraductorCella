@@ -11,8 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from order.serializer import OrderSerializer, OrderGetSerializer, OrderDetailSerializer
 from order.service import Orders
-from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError, \
-    AssembleError
+from utils.exception import NoParameterSpecified, WrongParameterValue, WrongParameterType, QueryError, StatusError
 from utils.pagination import StandardResultsSetPagination
 from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class OrderDetailView(RetrieveAPIView):
     serializer_class = OrderDetailSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_object(self):
         o_id = self.kwargs.get('o_id')
@@ -36,7 +35,7 @@ class OrderDetailView(RetrieveAPIView):
 
 class OrderListView(ListAPIView):
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     filterset_fields = ['status']
@@ -69,77 +68,8 @@ class OrderListView(ListAPIView):
         return Response(serializer.data)
 
 
-class OrderAssembleSpecificationView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-
-        try:
-            order_id = data['order_id']
-        except KeyError as ex:
-            logger.warning(f"'order_id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified('order_id')
-        try:
-            specification_id = data['specification_id']
-        except KeyError as ex:
-            logger.warning(f"'specification_id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified('specification_id')
-
-        if order_id is not None and specification_id is not None:
-            try:
-                Orders.assemble_specification(order_id, specification_id)
-                return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
-            except Orders.AssembleError:
-                logger.warning(
-                    f"Assemble info. Specification id: {specification_id}, order id: {order_id} | "
-                    f"{self.__class__.__name__}", exc_info=True)
-                raise AssembleError()
-        else:
-            if order_id is None:
-                logger.warning(f"order id is not specified | {self.__class__.__name__}")
-            if specification_id is None:
-                logger.warning(f"specification id is not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified()
-
-
-class OrderDisAssembleSpecificationView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-
-        try:
-            order_id = data['order_id']
-        except KeyError as ex:
-            logger.warning(f"'order_id' not specified | {self.__class__.__name__}", exc_info=True)
-            raise NoParameterSpecified('order_id')
-
-        try:
-            specification_id = data.get('specification_id', None)
-        except KeyError as ex:
-            logger.warning(f"'specification_id' not specified | {self.__class__.__name__}", exc_info=True)
-
-            raise NoParameterSpecified('specification_id')
-
-        if order_id is not None and specification_id is not None:
-            try:
-                Orders.disassemble_specification(order_id, specification_id)
-                return Response(data={"correct": True}, status=status.HTTP_202_ACCEPTED)
-            except Orders.AssembleError:
-                logger.warning(
-                    f"Disassemble info. Specification id: {specification_id}, order id: {order_id} | "
-                    f"{self.__class__.__name__}", exc_info=True)
-        else:
-            if order_id is None:
-                logger.warning(f"order id is None | {self.__class__.__name__}")
-            if specification_id is None:
-                logger.warning(f"specification id None | {self.__class__.__name__}")
-            raise NoParameterSpecified()
-
-
 class OrderManageActionView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+    permission_classes = [StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -158,14 +88,14 @@ class OrderManageActionView(APIView):
 
         if order_id is not None and action is not None:
             try:
-                if action == 'activate':
-                    Orders.activate(order_id, request.user)
-                elif action == 'deactivate':
-                    Orders.deactivate(order_id, request.user)
-                elif action == 'confirm':
-                    Orders.confirm(order_id, request.user)
+                if action == 'confirm':
+                    order = Orders.get(order_id)
+                    Orders.confirm(order, request.user)
+                    Orders.notify_new_status(order)
                 elif action == 'cancel':
-                    Orders.cancel(order_id, request.user)
+                    order = Orders.get(order_id)
+                    Orders.cancel(order, request.user)
+                    Orders.notify_new_status(order)
                 else:
                     raise WrongParameterValue('action')
             except Orders.ActionError:
@@ -181,7 +111,7 @@ class OrderManageActionView(APIView):
 
 
 class OrderAssemblingInfoView(APIView):
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         o_id = self.kwargs.get('o_id')
@@ -199,7 +129,7 @@ class OrderStatusCount(APIView):
 
 
 class OrderBulkDeleteView(APIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -216,21 +146,47 @@ class OrderBulkDeleteView(APIView):
 
 class OrderCreateView(CreateAPIView):
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         return serializer.save(request=self.request)
 
 
-class ReceiveOrderView(CreateAPIView):
-    serializer_class = OrderGetSerializer
+class ReceiveOrderView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (BasicAuthentication,)
 
-    def perform_create(self, serializer):
-        return serializer.save(request=self.request)
-
     def post(self, request, *args, **kwargs):
-        print(request.data)
-        return Response(data={'received': True}, status=status.HTTP_200_OK)
 
+        logger.info(f"Received order {request.data} | {self.__class__.__name__}")
+        data = request.data
+        external_id = data['ID']
+
+        try:
+            if 'create' in data:
+                specifications = data['products']
+                products = []
+
+                for specification in specifications:
+                    product = dict(product_id=specification['id'], amount=specification['amount'])
+                    products.append(product)
+
+                Orders.create(external_id=external_id, source='bitrix', products=products)
+            elif 'ship' in data:
+                Orders.confirm(external_id)
+            elif 'cancel' in data:
+                Orders.cancel(external_id)
+            elif 'change' in data:
+
+                specifications = data['products']
+                products = []
+
+                for specification in specifications:
+                    product = dict(product_id=specification['id'], amount=specification['amount'])
+                    products.append(product)
+
+                Orders.change(external_id=external_id, products=products)
+
+            return Response(data={'received': True}, status=status.HTTP_202_ACCEPTED)
+        except Exception as ex:
+            return Response(data={'received': False}, status=status.HTTP_400_BAD_REQUEST)

@@ -6,6 +6,7 @@ from specification.models import Specification
 
 class OrderSource(models.Model):
     name = models.CharField(max_length=150)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.name}"
@@ -14,9 +15,6 @@ class OrderSource(models.Model):
 class Order(models.Model):
     class OrderStatus(models.TextChoices):
         INACTIVE = 'INC', 'Inactive'
-        ACTIVE = 'ACT', 'Active'
-        ASSEMBLING = 'ASS', 'Assembling'
-        READY = 'RDY', 'Ready'
         ARCHIVED = 'ARC', 'Archived'
         CONFIRMED = 'CNF', 'Confirmed'
         CANCELED = 'CND', 'Canceled'
@@ -26,42 +24,30 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     source = models.ForeignKey(OrderSource, on_delete=models.SET_NULL, null=True)
 
+    def canceled(self):
+        return self.status == Order.OrderStatus.CANCELED
+
+    def archived(self):
+        return self.status == Order.OrderStatus.ARCHIVED
+
+    def confirmed(self):
+        return self.status == Order.OrderStatus.CONFIRMED
+
+    def confirm(self):
+        self.status = Order.OrderStatus.CONFIRMED
+
+    def archive(self):
+        self.status = Order.OrderStatus.ARCHIVED
+
+    def cancel(self):
+        self.status = Order.OrderStatus.CANCELED
+
     def __str__(self):
         return f"{self.external_id}"
 
 
 class OrderSpecification(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_specification')
-    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='order_specification')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_specifications')
+    specification = models.ForeignKey(Specification, on_delete=models.CASCADE, related_name='order_specifications')
     amount = models.IntegerField()
     assembled = models.BooleanField(default=False)
-    # created_at = models.DateTimeField(auto_now_add=True)
-
-
-class OrderAction(models.Model):
-    class ActionType(models.TextChoices):
-        CREATE = 'CRT', 'Create'
-        CONFIRM = 'CFM', 'Confirm'
-        CANCEL = 'CNL', 'Cancel'
-        ACTIVATE = 'ACT', 'Activate'
-        DEACTIVATE = 'DCT', 'Deactivate'
-        ASSEMBLING = 'ASS', 'Assembling'
-        PREPARING = 'PRP', 'Preparing'
-        ARCHIVATION = 'ARC', 'Archivation'
-        ASSEMBLING_SPECIFICATION = 'ASP', 'Assembling specification'
-        DISASSEMBLING_SPECIFICATION = 'DSS', 'Disassembling specification'
-
-    order = models.ForeignKey(Order,
-                              on_delete=models.CASCADE,
-                              related_name='order_actions',
-                              null=True)
-    action_type = models.CharField(max_length=3, choices=ActionType.choices)
-    time_stamp = models.DateTimeField(auto_now_add=True)
-    value = models.CharField(max_length=300, null=True, default=None)
-    operator = models.ForeignKey(Operator,
-                                 on_delete=models.SET_NULL,
-                                 related_name='order_actions',
-                                 null=True)
-
-    def __str__(self):
-        return f"{self.action_type} for {self.order}"

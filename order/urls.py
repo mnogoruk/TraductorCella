@@ -1,6 +1,7 @@
 from django.urls import path
 
-from order.views import OrderDetailView, OrderCreateView, OrderListView,\
+
+from order.views import OrderDetailView, OrderCreateView, OrderListView, \
     OrderManageActionView, OrderAssemblingInfoView, OrderBulkDeleteView, \
     OrderStatusCount, ReceiveOrderView
 

@@ -27,6 +27,7 @@ SECRET_KEY = '07(%r!aj4lnz+xu0hjn3ruhjeu3@kgw8#sc96_t5(x^lw=yr6y'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+TESTING = DEBUG
 
 ALLOWED_HOSTS = ['*']
 
@@ -156,8 +157,9 @@ REST_FRAMEWORK = {
     # 'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated']
 }
 
+# BITRIX_URL = "https://smola20.art-clever.ru/"
+BITRIX_URL = "127.0.0.1:8000/"
 
-BITRIX_URL = "https://smola20.art-clever.ru/"
 BITRIX_AUF_CONF = {"login": "dev", "password": "123456"}
 
 SIMPLE_JWT = {

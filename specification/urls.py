@@ -1,10 +1,10 @@
 from django.urls import path
-
 from specification.views import SpecificationDetailView, SpecificationListView, SpecificationCategoryListView, \
     SpecificationCreateView, SpecificationCreateCategoryView, SpecificationEditView, SpecificationSetPriceView, \
     SpecificationSetCoefficientView, SpecificationAssembleInfoView, SpecificationBuildSetView, \
     SpecificationSetCategoryView, SpecificationBulkDeleteView, SpecificationListShortView, SpecifiedVerifyPriceCount, \
     SpecificationXMLUploadView, SpecificationSetAmountView, ManageBuild
+
 
 urlpatterns = [
     path('<int:s_id>/', SpecificationDetailView.as_view()),

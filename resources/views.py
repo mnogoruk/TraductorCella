@@ -9,18 +9,18 @@ from logging import getLogger
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from authentication.models import Operator
 from cella.serializer import FileSerializer
-from cella.service import Operators
+
 from resources.models import Resource
-from resources.serializer import ResourceSerializer, ResourceWithUnverifiedCostSerializer, ResourceActionSerializer, \
+from resources.serializer import ResourceSerializer, \
     ResourceShortSerializer, ResourceProviderSerializer, ResourceDeliverySerializer
 
 from resources.service import Resources
 from utils.exception import ParameterExceptions, NoParameterSpecified, FileException, CreationError, UpdateError, \
     QueryError, WrongParameterType
 from utils.pagination import StandardResultsSetPagination
-from authentication.permissions import OfficeWorkerPermission, AdminPermission, StorageWorkerPermission, \
-    DefaultPermission
+from authentication.permissions import OfficeWorkerPermission, StorageWorkerPermission, DefaultPermission
 from rest_framework.permissions import IsAuthenticated
 
 logger = getLogger(__name__)
@@ -28,13 +28,13 @@ logger = getLogger(__name__)
 
 class ResourceDetailView(RetrieveAPIView):
     serializer_class = ResourceSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_object(self):
         r_id = self.kwargs['r_id']
         try:
             resource = Resources.detail(r_id)
-        except Resource.DoesNotExist:
+        except Resources.ResourceDoesNotExist:
             logger.warning(f"Can`t get object 'Resource' with id: {r_id} | {self.__class__.__name__}")
             raise Http404()
 
@@ -43,7 +43,7 @@ class ResourceDetailView(RetrieveAPIView):
 
 class ResourceCreateView(CreateAPIView):
     serializer_class = ResourceSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         try:
@@ -57,7 +57,7 @@ class ResourceCreateView(CreateAPIView):
 
 class ResourceUpdateView(UpdateAPIView):
     serializer_class = ResourceSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def perform_update(self, serializer):
         try:
@@ -79,20 +79,8 @@ class ResourceUpdateView(UpdateAPIView):
         return resource
 
 
-class ResourceWithUnverifiedCostsView(ListAPIView):
-    serializer_class = ResourceWithUnverifiedCostSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
-
-    def get_queryset(self):
-        try:
-            return Resources.with_unverified_cost()
-        except Resources.QueryError:
-            logger.warning(f"Query error | {self.__class__.__name__}", exc_info=True)
-            raise QueryError()
-
-
 class ExpiredResourceCount(APIView):
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         return Response(data={'count': Resources.expired_count()}, status=status.HTTP_200_OK)
@@ -125,21 +113,9 @@ class ResourceListView(ListAPIView):
             raise QueryError()
 
 
-class ResourceActionsView(ListAPIView):
-    serializer_class = ResourceActionSerializer
-    permission_classes = [IsAuthenticated, AdminPermission]
-
-    def get_queryset(self):
-        try:
-            return Resources.actions(self.kwargs['r_id'])
-        except Resources.QueryError:
-            logger.warning(f"Query error | {self.__class__.__name__}", exc_info=True)
-            raise QueryError()
-
-
 class ResourceShortListView(ListAPIView):
     serializer_class = ResourceShortSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -149,114 +125,9 @@ class ResourceShortListView(ListAPIView):
             raise QueryError()
 
 
-class ResourceSetCostView(APIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        try:
-            r_id = data['id']
-        except KeyError as ex:
-            logger.warning(f"'id' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('id')
-        try:
-            value = float(data['cost'])
-        except KeyError as ex:
-            logger.warning(f"'cost' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('cost')
-        except TypeError as ex:
-            logger.warning(f"'cost' wrong type")
-            raise WrongParameterType('cost', 'float')
-        if value is not None:
-            try:
-                cost, _ = Resources.set_cost(r_id, value, request.user)
-            except Resources.UpdateError:
-                logger.warning(f"Update error | {self.__class__.__name__}")
-                raise UpdateError()
-            return Response(data={'id': r_id, 'cost': cost.value}, status=status.HTTP_202_ACCEPTED)
-        else:
-            logger.warning(f"Set cost | {self.__class__.__name__}")
-            raise NoParameterSpecified()
-
-
-class ResourceSetAmount(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
-
-    def post(self, request, *args, **keargs):
-        data = request.data
-        try:
-            r_id = data['id']
-        except KeyError as ex:
-            logger.warning(f"'id' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('id')
-        try:
-            amount = float(data['amount'])
-        except KeyError as ex:
-            logger.warning(f"'amount' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('amount')
-        except TypeError as ex:
-            logger.warning(f"'amount' wrong type | {self.__class__.__name__}")
-            WrongParameterType('cost', 'float')
-        try:
-            amount, _ = Resources.set_amount(r_id, amount, user=request.user)
-        except Resources.UpdateError:
-            logger.warning(f"Update error | {self.__class__.__name__}", exc_info=True)
-            raise UpdateError()
-        return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
-
-
-class ResourceAddAmountView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        try:
-            r_id = data['id']
-        except KeyError as ex:
-            logger.warning(f"'id' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('id')
-        try:
-            delta_amount = float(data['amount'])
-        except KeyError as ex:
-            logger.warning(f"'amount' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('amount')
-        except TypeError as ex:
-            logger.warning(f"'amount' wrong type | {self.__class__.__name__}")
-            WrongParameterType('cost', 'float')
-        try:
-            amount, _ = Resources.change_amount(r_id, delta_amount, user=request.user)
-        except Resources.UpdateError:
-            logger.warning(f"Update error | {self.__class__.__name__}", exc_info=True)
-            raise UpdateError()
-        return Response(data={'id': r_id, 'amount': amount}, status=status.HTTP_202_ACCEPTED)
-
-
-# Deprecated
-class ResourceVerifyCostView(APIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        try:
-            ids = data['ids']
-        except KeyError as ex:
-            logger.warning(f"'id' not specified | {self.__class__.__name__}")
-            raise NoParameterSpecified('ids')
-        if not isinstance(ids, list):
-            logger.warning(f"'ids' has wrong type. Type: {type(ids)} | {self.__class__.__name__}")
-            raise ParameterExceptions(detail="'ids' must be list object.")
-        if ids is not None:
-            try:
-                Resources.verify_cost(ids, request.user)
-            except Resources.UpdateError:
-                logger.warning(f"Update error | {self.__class__.__name__}", exc_info=True)
-                raise UpdateError()
-            return Response(data={'correct': True}, status=status.HTTP_202_ACCEPTED)
-
-
 class ProviderListView(ListAPIView):
     serializer_class = ResourceProviderSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -266,21 +137,20 @@ class ProviderListView(ListAPIView):
             raise QueryError()
 
 
-# TODO: ...
 class ResourceExelUploadView(CreateAPIView):
     serializer_class = FileSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.instance = None
 
     def post(self, request, *args, **kwargs):
-
         response = super(ResourceExelUploadView, self).post(request, *args, **kwargs)
         instance = self.get_instance()
         try:
-            operator = Operators.get_operator(request.user)
+            operator = Operator.objects.get_or_create_operator(request.user)
+            print(operator)
             creation = async_to_sync(Resources.create_from_excel)
             creation(file_instance_id=instance.id, operator_id=operator.id)
         except Exception as e:
@@ -297,7 +167,7 @@ class ResourceExelUploadView(CreateAPIView):
 
 # Deprecated
 class ResourceBulkDeleteView(APIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -318,7 +188,7 @@ class ResourceBulkDeleteView(APIView):
 
 
 class MakeDeliveryView(CreateAPIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
     serializer_class = ResourceDeliverySerializer
 
     def perform_create(self, serializer):

@@ -25,3 +25,25 @@ def product_amounts(objects, amount_list):
                 ret.append({'specification': obj, 'amount': pair['amount']})
                 break
     return ret
+
+
+def dict_items_to_str(data):
+    norm_data = {}
+    if isinstance(data, dict):
+        for pair in data.items():
+            norm_data[dict_items_to_str(pair[0])] = dict_items_to_str(pair[1])
+    elif data is not None:
+        return str(data)
+    else:
+        return None
+    return norm_data
+
+
+def remove_empty_str(data):
+    norm_data = {}
+    if isinstance(data, dict):
+        for pair in data.items():
+            norm_data[pair[0]] = remove_empty_str(pair[1])
+    elif data == '':
+        return None
+    return norm_data

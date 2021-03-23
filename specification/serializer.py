@@ -61,7 +61,8 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
     amount = serializers.IntegerField(allow_null=True, required=False, default=0, min_value=0)
     available_to_assemble = serializers.IntegerField(read_only=True, allow_null=True)
     prime_cost = serializers.DecimalField(max_digits=12, decimal_places=2, default=0, allow_null=True, read_only=True)
-    storage_place = serializers.CharField(allow_null=True, required=False)
+    storage_place = serializers.CharField(allow_null=True, required=False, allow_blank=True)
+    amount_accuracy = serializers.CharField(max_length=1, allow_null=True, allow_blank=True, default='')
 
     def validate_resources_create(self, value):
         if len(value) == 0:
@@ -84,7 +85,7 @@ class SpecificationDetailSerializer(serializers.ModelSerializer):
             product_id=validated_data['product_id'],
             price=validated_data['price'],
             coefficient=validated_data['coefficient'],
-            resources=validated_data['resources_create'],
+            resources_create=validated_data['resources_create'],
             category_name=validated_data['category_name'],
             amount=validated_data['amount'],
             storage_place=validated_data.get('storage_place'),
@@ -118,6 +119,7 @@ class SpecificationEditSerializer(serializers.ModelSerializer):
     resource_to_delete = serializers.ListField(required=False, default=[], write_only=True)
     resources = SpecificationResourceSerializer(many=True, read_only=True)
     category = SpecificationCategorySerializer(read_only=True)
+    storage_place = serializers.CharField(allow_blank=True, allow_null=True)
 
     def update(self, instance, validated_data):
         return Specifications.edit(instance, **validated_data)

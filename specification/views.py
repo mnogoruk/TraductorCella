@@ -10,8 +10,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
+from authentication.models import Operator
 from cella.serializer import FileSerializer
-from cella.service import Operators
 from resources.models import Resource
 from resources.service import Resources
 from specification.models import Specification
@@ -29,7 +29,7 @@ logger = getLogger(__name__)
 
 class SpecificationCategoryListView(ListAPIView):
     serializer_class = SpecificationCategorySerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_queryset(self):
         try:
@@ -40,7 +40,7 @@ class SpecificationCategoryListView(ListAPIView):
 
 class SpecificationDetailView(RetrieveAPIView):
     serializer_class = SpecificationDetailSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get_object(self):
         s_id = self.kwargs['s_id']
@@ -56,7 +56,7 @@ class SpecificationDetailView(RetrieveAPIView):
 
 class SpecificationListView(ListAPIView):
     serializer_class = SpecificationListSerializer
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
     pagination_class = StandardResultsSetPagination
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     filterset_fields = ['verified']
@@ -82,7 +82,7 @@ class SpecificationListView(ListAPIView):
 
 class SpecificationCreateView(CreateAPIView):
     serializer_class = SpecificationDetailSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def perform_create(self, serializer):
         try:
@@ -98,7 +98,7 @@ class SpecificationCreateView(CreateAPIView):
 
 class SpecificationEditView(RetrieveUpdateAPIView):
     serializer_class = SpecificationEditSerializer
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def perform_update(self, serializer):
         try:
@@ -119,7 +119,7 @@ class SpecificationEditView(RetrieveUpdateAPIView):
 
 
 class SpecificationSetPriceView(APIView):
-    permission_classes = [IsAuthenticated, AdminPermission]
+    permission_classes = [AdminPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -175,7 +175,7 @@ class SpecificationSetAmountView(APIView):
 
 
 class SpecificationSetCoefficientView(APIView):
-    permission_classes = [IsAuthenticated, AdminPermission]
+    permission_classes = [AdminPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -203,7 +203,7 @@ class SpecificationSetCoefficientView(APIView):
 
 
 class SpecificationSetCategoryView(APIView):
-    permission_classes = [IsAuthenticated, AdminPermission]
+    permission_classes = [AdminPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -229,7 +229,7 @@ class SpecificationSetCategoryView(APIView):
 
 
 class SpecificationAssembleInfoView(APIView):
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         s_id = self.kwargs['s_id']
@@ -244,7 +244,7 @@ class SpecificationAssembleInfoView(APIView):
 
 
 class SpecificationBuildSetView(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+    permission_classes = [StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -272,7 +272,7 @@ class SpecificationBuildSetView(APIView):
 
 
 class SpecificationBulkDeleteView(APIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -290,7 +290,7 @@ class SpecificationBulkDeleteView(APIView):
 
 
 class SpecificationCreateCategoryView(CreateAPIView):
-    permission_classes = [IsAuthenticated, OfficeWorkerPermission]
+    permission_classes = [OfficeWorkerPermission]
     serializer_class = SpecificationCategorySerializer
 
 
@@ -302,7 +302,7 @@ class SpecificationListShortView(ListAPIView):
 
 
 class SpecifiedVerifyPriceCount(APIView):
-    permission_classes = [IsAuthenticated, DefaultPermission]
+    permission_classes = [DefaultPermission]
 
     def get(self, request, *args, **kwargs):
         return Response(data={'count': Specifications.verify_price_count()}, status=status.HTTP_202_ACCEPTED)
@@ -322,7 +322,7 @@ class SpecificationXMLUploadView(CreateAPIView):
         instance = self.get_instance()
         print("deedededededededelzskrfnkbjdnafzskv bksdb xfkved")
         try:
-            operator = Operators.get_operator(request.user)
+            operator = Operator.objects.get_or_create_operator(request.user)
             creation = async_to_sync(Specifications.create_from_xml)
             creation(file_instance_id=instance.id, operator_id=operator.id)
         except Exception as e:
@@ -338,7 +338,7 @@ class SpecificationXMLUploadView(CreateAPIView):
 
 
 class ManageBuild(APIView):
-    permission_classes = [IsAuthenticated, StorageWorkerPermission]
+    permission_classes = [StorageWorkerPermission]
 
     def post(self, request, *args, **kwargs):
         data = request.data

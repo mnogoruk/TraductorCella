@@ -39,7 +39,7 @@ class OrderSourceSerializer(serializers.ModelSerializer):
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
-    order_specification = OrderDetailSpecificationSerializer(many=True, read_only=True)
+    order_specifications = OrderDetailSpecificationSerializer(many=True, read_only=True)
 
     missing_resources = serializers.ListField(read_only=True, allow_null=True)
     missing_specifications = serializers.ListField(read_only=True, allow_null=True)
@@ -50,7 +50,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    order_specification = OrderSpecificationSerializer(many=True, read_only=True)
+    order_specifications = OrderSpecificationSerializer(many=True, read_only=True, allow_null=True)
     specifications_create = OrderSpecificationCreateUpdateSerializer(write_only=True, many=True)
     source = OrderSourceSerializer(read_only=True)
     source_name = serializers.CharField(max_length=100, write_only=True, allow_null=True, required=False,
@@ -94,35 +94,3 @@ class ProductSerializer(serializers.Serializer):
 
     id = serializers.CharField(required=True)
     amount = serializers.DecimalField(required=True, decimal_places=2, max_digits=12)
-
-
-class OrderGetSerializer(serializers.ModelSerializer):
-    ID = serializers.CharField(required=True, allow_null=False, write_only=True)
-    status = serializers.CharField(required=False, allow_null=True, write_only=True)
-    products = ProductSerializer(many=True, required=False, allow_null=True, write_only=True)
-
-    def validate_products(self, value):
-        if len(value) == 0:
-            return value
-        else:
-            specs = []
-            for pair in value:
-                if pair['id'] in specs:
-                    raise serializers.ValidationError('Products duplicates.')
-                else:
-                    specs.append({"product_id": str(pair['id']), "amount": pair['amount']})
-            return specs
-
-    def create(self, validated_data):
-        order = Orders.create(
-            external_id=validated_data['ID'],
-            source="Bitrix",
-            products=validated_data['products'],
-            user=validated_data['request'].user
-        )
-        return order
-
-    class Meta:
-        model = Order
-        fields = ['ID', 'status', 'products']
-

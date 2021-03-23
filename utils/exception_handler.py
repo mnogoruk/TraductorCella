@@ -14,7 +14,7 @@ def custom_exception_handler(exc, context):
     if response is not None:
         response.data['status_code'] = response.status_code
     else:
-        if not settings.DEBUG:
+        if not settings.TESTING:
             logger.error(f"Unexpected error.")
             response = Response(data={'detail': 'Unexpected error.', 'status_code': 500},
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
